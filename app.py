@@ -31,6 +31,37 @@ DB_PATH = os.path.join(BASE_DIR, "database.db")
 conn = sqlite3.connect(DB_PATH, check_same_thread=False)
 cur = conn.cursor()
 
+conn = sqlite3.connect(DB_PATH, check_same_thread=False)
+cur = conn.cursor()
+
+cur.execute("""
+CREATE TABLE IF NOT EXISTS exams (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    exam_name TEXT,
+    subject TEXT,
+    total_marks INTEGER,
+    timer_minutes INTEGER,
+    enable_timer INTEGER DEFAULT 0,
+    started INTEGER DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+)
+""")
+
+cur.execute("""
+CREATE TABLE IF NOT EXISTS questions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    exam_id INTEGER,
+    question TEXT,
+    option_a TEXT,
+    option_b TEXT,
+    option_c TEXT,
+    option_d TEXT,
+    correct_answer TEXT
+)
+""")
+
+conn.commit()
+
 def init_db():
     # 1️⃣ CREATE TABLES (SAFE)
     cur.execute("""
@@ -94,55 +125,40 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 
 
-
 def init_db():
-    conn = get_db()
+    conn = sqlite3.connect(DB_PATH, check_same_thread=False)
     cur = conn.cursor()
 
     cur.execute("""
-        CREATE TABLE IF NOT EXISTS exams (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            started INTEGER DEFAULT 0
-        )
+    CREATE TABLE IF NOT EXISTS exams (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        exam_name TEXT,
+        subject TEXT,
+        total_marks INTEGER,
+        timer_minutes INTEGER,
+        enable_timer INTEGER DEFAULT 0,
+        started INTEGER DEFAULT 0,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
     """)
 
     cur.execute("""
-        CREATE TABLE IF NOT EXISTS students (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            exam_id INTEGER,
-            roll TEXT,
-            name TEXT,
-            status TEXT
-        )
-    """)
-
-    cur.execute("""
-        CREATE TABLE IF NOT EXISTS questions (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            exam_id INTEGER,
-            question TEXT,
-            option_a TEXT,
-            option_b TEXT,
-            option_c TEXT,
-            option_d TEXT,
-            correct_option TEXT
-        )
-    """)
-
-    cur.execute("""
-        CREATE TABLE IF NOT EXISTS answers (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            exam_id INTEGER,
-            roll TEXT,
-            question_id INTEGER,
-            selected_option TEXT
-        )
+    CREATE TABLE IF NOT EXISTS questions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        exam_id INTEGER,
+        question TEXT,
+        option_a TEXT,
+        option_b TEXT,
+        option_c TEXT,
+        option_d TEXT,
+        correct_answer TEXT
+    )
     """)
 
     conn.commit()
     conn.close()
 
-init_db()
+init_db()    
 
 # -------------------------------------------------
 # HOME (OLD UI)
