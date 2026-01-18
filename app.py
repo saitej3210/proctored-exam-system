@@ -18,16 +18,14 @@ from database import get_db, insert_student, _db_lock
 
 import sqlite3
 
-def get_db():
-    conn = sqlite3.connect("database.db")
-    conn.row_factory = sqlite3.Row   # 🔥 THIS LINE FIXES EVERYTHING
-    return conn
+
 
 # -------------------------------------------------
 # APP INIT
 # -------------------------------------------------
 app = Flask(__name__, template_folder="templates")
-app.secret_key = "secret123"
+import os
+app.secret_key = os.environ.get("SECRET_KEY", "fallback-secret")
 
 UPLOAD_FOLDER = "uploads"
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
