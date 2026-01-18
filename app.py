@@ -28,6 +28,21 @@ import sqlite3
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DB_PATH = os.path.join(BASE_DIR, "database.db")
 
+def ensure_columns():
+    cur.execute("PRAGMA table_info(exams)")
+    cols = [c[1] for c in cur.fetchall()]
+
+    if "enable_timer" not in cols:
+        cur.execute("ALTER TABLE exams ADD COLUMN enable_timer INTEGER DEFAULT 0")
+
+    if "started" not in cols:
+        cur.execute("ALTER TABLE exams ADD COLUMN started INTEGER DEFAULT 0")
+
+    if "timer_minutes" not in cols:
+        cur.execute("ALTER TABLE exams ADD COLUMN timer_minutes INTEGER")
+
+    conn.commit()
+
 conn = sqlite3.connect(DB_PATH, check_same_thread=False)
 cur = conn.cursor()
 
@@ -56,7 +71,7 @@ CREATE TABLE IF NOT EXISTS questions (
     correct_answer TEXT
 )
 """)
-
+ensure_columns
 conn.commit()
 
 
