@@ -31,45 +31,7 @@ DB_PATH = os.path.join(BASE_DIR, "database_v2.db")
 
 
 
-def init_db():
-    conn = sqlite3.connect(DB_PATH, check_same_thread=False)
-    cur = conn.cursor()
-    # 🚨 FORCE RESET (TEMPORARY)
-    cur.execute("DROP TABLE IF EXISTS exams")
-    cur.execute("DROP TABLE IF EXISTS questions")
 
-    cur.execute("""
-    CREATE TABLE IF NOT EXISTS exams (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        exam_name TEXT,
-        subject TEXT,
-        total_marks INTEGER,
-        timer_minutes INTEGER,
-        enable_timer INTEGER DEFAULT 0,
-        started INTEGER DEFAULT 0,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    )
-    """)
-
-    cur.execute("""
-    CREATE TABLE  questions (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        exam_id INTEGER,
-        question TEXT,
-        option_a TEXT,
-        option_b TEXT,
-        option_c TEXT,
-        option_d TEXT,
-        correct_answer TEXT
-    )
-    """)
-
-    conn.commit()
-    conn.close()
-   
-
-# 🔥 VERY IMPORTANT
-init_db()
 
 # ---------------- APP INIT ----------------
 app = Flask(__name__, template_folder="templates")
@@ -96,8 +58,13 @@ def init_db():
     conn = sqlite3.connect(DB_PATH, check_same_thread=False)
     cur = conn.cursor()
 
+    # 🔥 TEMP RESET (ONLY NOW)
+    cur.execute("DROP TABLE IF EXISTS exams")
+    cur.execute("DROP TABLE IF EXISTS questions")
+
+    # ✅ CREATE exams
     cur.execute("""
-    CREATE TABLE IF NOT EXISTS exams (
+    CREATE TABLE exams (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         exam_name TEXT,
         subject TEXT,
@@ -109,8 +76,9 @@ def init_db():
     )
     """)
 
+    # ✅ CREATE questions
     cur.execute("""
-    CREATE TABLE IF NOT EXISTS questions (
+    CREATE TABLE questions (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         exam_id INTEGER,
         question TEXT,
@@ -170,13 +138,10 @@ def create_exam():
         return redirect("/admin/login")
 
     if request.method == "POST":
-
-        # 🔹 FORM VALUES (MISSING PART)
         exam_name = request.form.get("exam_name")
         subject = request.form.get("subject")
         total_marks = int(request.form.get("total_marks", 0))
 
-        # 🔹 TIMER FIX
         enable_timer = 1 if request.form.get("enable_timer") else 0
         timer_minutes = request.form.get("timer_minutes")
         timer_minutes = int(timer_minutes) if timer_minutes else 0
@@ -192,8 +157,7 @@ def create_exam():
             timer_minutes,
             enable_timer,
             started
-        )
-        VALUES (?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?)
         """, (
             exam_name,
             subject,
