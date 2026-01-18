@@ -5,3 +5,4 @@ proctored.db
 __pycache__/
 *.sqbpro
 .env
+uploads/

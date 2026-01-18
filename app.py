@@ -3,7 +3,7 @@ import time
 import os
 import sqlite3
 import pdfplumber
-from db import init_db, migrate_questions_table
+from db import get_db, init_db, migrate_questions_table
 from flask import (
     Flask,
     request,
@@ -13,10 +13,14 @@ from flask import (
     send_from_directory
 )
 
+from db import (
+    init_db,
+    get_db
+)
 # --------------------------------
 # ONLY for init & migration
 # --------------------------------
-from db import init_db, migrate_questions_table
+
 
 # --------------------------------
 # Runtime DB usage (students, inserts, locks)
@@ -31,14 +35,14 @@ from db import get_db
 app = Flask(__name__, template_folder="templates")
 app.secret_key = os.environ.get("SECRET_KEY", "fallback-secret")
 
-
-# --------------------------------
-# APP START (RUN ONCE)
-# --------------------------------
+# 🔥 RUN ONCE AT START
 with app.app_context():
     init_db()
-    migrate_questions_table()
-
+   #migrate_questions_table()
+   #migrate_students_table()
+   #migrate_exam_sessions_table()
+   #migrate_results_table()
+   #migrate_exams_table()
 
 # --------------------------------
 # Uploads
