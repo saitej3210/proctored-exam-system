@@ -52,6 +52,18 @@ try:
     conn.commit()
 except Exception:
     pass
+
+# ---- SAFE DB MIGRATION ----
+def ensure_exam_columns():
+    cur.execute("PRAGMA table_info(exams)")
+    columns = [c[1] for c in cur.fetchall()]
+
+    if "enable_timer" not in columns:
+        cur.execute("ALTER TABLE exams ADD COLUMN enable_timer INTEGER DEFAULT 0")
+
+    conn.commit()
+
+ensure_exam_columns()
 # -------------------------------------------------
 # APP INIT
 # -------------------------------------------------
