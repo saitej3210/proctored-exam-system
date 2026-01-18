@@ -23,57 +23,51 @@ import pdfplumber
 
 import os
 import sqlite3
+from flask import Flask
 
+# ---------------- PATHS ----------------
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DB_PATH = os.path.join(BASE_DIR, "database.db")
 
-conn = sqlite3.connect(DB_PATH, check_same_thread=False)
-cur = conn.cursor()
-# --- AUTO MIGRATION: add enable_timer column if missing ---
-try:
-    cur.execute("ALTER TABLE exams ADD COLUMN enable_timer INTEGER DEFAULT 0")
-    conn.commit()
-    print("enable_timer column added")
-except sqlite3.OperationalError as e:
-    if "duplicate column name" in str(e):
-        pass  # column already exists
-    else:
-        raise
-# -------------------------------
-# AUTO DB MIGRATION (RENDER SAFE)
-# -------------------------------
+def get_db():
+    conn = sqlite3.connect(DB_PATH, check_same_thread=False)
+    conn.row_factory = sqlite3.Row
+    return conn
 
-cur.execute("""
-CREATE TABLE IF NOT EXISTS exams (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    exam_name TEXT,
-    subject TEXT,
-    total_marks INTEGER,
-    timer_minutes INTEGER,
-    enable_timer INTEGER DEFAULT 0,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-)
-""")
-conn.commit()
+# ---------------- SAFE DB INIT ----------------
+def init_db():
+    conn = get_db()
+    cur = conn.cursor()
 
-# add column if missing (old DB fix)
-try:
-    cur.execute("ALTER TABLE exams ADD COLUMN enable_timer INTEGER DEFAULT 0")
-    conn.commit()
-except Exception:
-    pass
+    # 1️⃣ Create table safely (minimal columns)
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS exams (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        title TEXT,
+        description TEXT,
+        timer_minutes INTEGER
+    )
+    """)
 
-# ---- SAFE DB MIGRATION ----
-def ensure_exam_columns():
+    # 2️⃣ Check existing columns
     cur.execute("PRAGMA table_info(exams)")
     columns = [c[1] for c in cur.fetchall()]
 
+    # 3️⃣ Add enable_timer ONLY if missing
     if "enable_timer" not in columns:
-        cur.execute("ALTER TABLE exams ADD COLUMN enable_timer INTEGER DEFAULT 0")
+        cur.execute(
+            "ALTER TABLE exams ADD COLUMN enable_timer INTEGER DEFAULT 0"
+        )
 
     conn.commit()
+    conn.close()
 
-ensure_exam_columns()
+# ---------------- APP INIT ----------------
+app = Flask(__name__, template_folder="templates")
+app.secret_key = os.environ.get("SECRET_KEY", "fallback-secret")
+
+# 🔥 VERY IMPORTANT: call AFTER app creation
+init_db()
 # -------------------------------------------------
 # APP INIT
 # -------------------------------------------------
