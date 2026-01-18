@@ -21,7 +21,7 @@ from db import  migrate_questions_table
 # --------------------------------
 # Runtime DB usage (students, inserts, locks)
 # --------------------------------
-from database import get_db, insert_student, _db_lock
+from database import get_db, insert_student, _db_lock , init_db
 
 
 # --------------------------------
@@ -35,6 +35,7 @@ app.secret_key = os.environ.get("SECRET_KEY", "fallback-secret")
 # APP START (RUN ONCE)
 # --------------------------------
 with app.app_context():
+    init_db()
     migrate_questions_table()
 
 
