@@ -3,64 +3,52 @@ import time
 import os
 import sqlite3
 import pdfplumber
-from db import get_db
-from db import migrate_questions_table
+
 from flask import (
-     Flask,
-     request,
-     redirect,
-     render_template,
-     session,
-     send_from_directory
+    Flask,
+    request,
+    redirect,
+    render_template,
+    session,
+    send_from_directory
 )
 
+# --------------------------------
+# ONLY for init & migration
+# --------------------------------
+from db import init_db, migrate_questions_table
+
+# --------------------------------
+# Runtime DB usage (students, inserts, locks)
+# --------------------------------
 from database import get_db, insert_student, _db_lock
 
 
-import sqlite3
-
-import pdfplumber
-
-
-import sqlite3
-import os
-
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DB_PATH = os.path.join(BASE_DIR, "database_v2.db")
-
-def get_db():
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    return conn
-
-
-
-
-
-
-# ---------------- APP INIT ----------------
-import os
-from flask import Flask
-
+# --------------------------------
+# APP INIT
+# --------------------------------
 app = Flask(__name__, template_folder="templates")
 app.secret_key = os.environ.get("SECRET_KEY", "fallback-secret")
 
+
+# --------------------------------
+# APP START (RUN ONCE)
+# --------------------------------
+with app.app_context():
+    init_db()
+    migrate_questions_table()
+
+
+# --------------------------------
+# Uploads
+# --------------------------------
 UPLOAD_FOLDER = "uploads"
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
-migrate_questions_table()
 
-
-# 🔥 VERY IMPORTANT: call AFTER app creation
-# -------------------------------------------------
-# APP INIT
-# -------------------------------------------------
-
-
-# -------------------------------------------------
-# DB INIT
-# -------------------------------------------------
-
+# --------------------------------
+# DB INIT (DO NOT DELETE)
+# --------------------------------
 def init_db():
     conn = get_db()
     cur = conn.cursor()
@@ -92,9 +80,12 @@ def init_db():
     """)
 
     conn.commit()
-    conn.close()  
+    conn.close()
 
-init_db()    
+
+# --------------------------------
+# HOME (OLD UI)
+# --------------------------------
 
 # -------------------------------------------------
 # HOME (OLD UI)
