@@ -25,66 +25,24 @@ import pdfplumber
 import os
 import sqlite3
 
-# ===============================
-# DATABASE SETUP (SAFE & FINAL)
-# ===============================
-
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DB_PATH = os.path.join(BASE_DIR, "database.db")
-
-print("🔥 USING DB PATH:", DB_PATH)
 
 conn = sqlite3.connect(DB_PATH, check_same_thread=False)
 cur = conn.cursor()
 
-def ensure_column(table, column, col_type):
-    cur.execute(f"PRAGMA table_info({table})")
-    columns = [c[1] for c in cur.fetchall()]
-    if column not in columns:
-        cur.execute(f"ALTER TABLE {table} ADD COLUMN {column} {col_type}")
-        conn.commit()
-
-# ---- auto migrate exams table ----
-ensure_column("exams", "timer_minutes", "INTEGER")
-ensure_column("exams", "enable_timer", "INTEGER DEFAULT 0")
-ensure_column("exams", "started", "INTEGER DEFAULT 0")
-
-# ---- auto migrate questions table (safe) ----
-ensure_column("questions", "option_a", "TEXT")
-ensure_column("questions", "option_b", "TEXT")
-ensure_column("questions", "option_c", "TEXT")
-ensure_column("questions", "option_d", "TEXT")
-
-
-def ensure_columns():
-    # ---- exams table ----
+def init_db():
+    # 1️⃣ CREATE TABLES (SAFE)
     cur.execute("""
     CREATE TABLE IF NOT EXISTS exams (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         exam_name TEXT,
         subject TEXT,
         total_marks INTEGER,
-        timer_minutes INTEGER,
-        enable_timer INTEGER DEFAULT 0,
-        started INTEGER DEFAULT 0,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        timer_minutes INTEGER
     )
     """)
 
-    # add missing columns safely
-    cur.execute("PRAGMA table_info(exams)")
-    cols = [c[1] for c in cur.fetchall()]
-
-    if "timer_minutes" not in cols:
-        cur.execute("ALTER TABLE exams ADD COLUMN timer_minutes INTEGER")
-
-    if "enable_timer" not in cols:
-        cur.execute("ALTER TABLE exams ADD COLUMN enable_timer INTEGER DEFAULT 0")
-
-    if "started" not in cols:
-        cur.execute("ALTER TABLE exams ADD COLUMN started INTEGER DEFAULT 0")
-
-    # ---- questions table ----
     cur.execute("""
     CREATE TABLE IF NOT EXISTS questions (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -99,11 +57,21 @@ def ensure_columns():
     """)
 
     conn.commit()
-    print("✅ DATABASE READY")
 
+    # 2️⃣ ADD MISSING COLUMNS (SAFE MIGRATION)
+    cur.execute("PRAGMA table_info(exams)")
+    columns = [c[1] for c in cur.fetchall()]
 
-ensure_columns()
+    if "enable_timer" not in columns:
+        cur.execute("ALTER TABLE exams ADD COLUMN enable_timer INTEGER DEFAULT 0")
 
+    if "started" not in columns:
+        cur.execute("ALTER TABLE exams ADD COLUMN started INTEGER DEFAULT 0")
+
+    conn.commit()
+
+# 🔥 VERY IMPORTANT
+init_db()
 
 # ---------------- APP INIT ----------------
 app = Flask(__name__, template_folder="templates")
@@ -213,7 +181,6 @@ def admin_dashboard():
 # -------------------------------------------------
 # CREATE EXAM
 # -------------------------------------------------
-
 @app.route("/create-exam", methods=["GET", "POST"])
 def create_exam():
     if not session.get("admin"):
@@ -221,27 +188,36 @@ def create_exam():
 
     if request.method == "POST":
 
-        # ✅ TIMER FIX START
-        enable_timer = 1 if request.form.get("enable_timer") else 0
+        # 🔹 FORM VALUES (MISSING PART)
+        exam_name = request.form.get("exam_name")
+        subject = request.form.get("subject")
+        total_marks = int(request.form.get("total_marks", 0))
 
+        # 🔹 TIMER FIX
+        enable_timer = 1 if request.form.get("enable_timer") else 0
         timer_minutes = request.form.get("timer_minutes")
         timer_minutes = int(timer_minutes) if timer_minutes else 0
-        # ✅ TIMER FIX END
 
         conn = get_db()
         cur = conn.cursor()
 
         cur.execute("""
-            INSERT INTO exams (
-                started,
-                enable_timer,
-                timer_minutes
-            )
-            VALUES (?, ?, ?)
-        """, (
-            0,
+        INSERT INTO exams (
+            exam_name,
+            subject,
+            total_marks,
+            timer_minutes,
             enable_timer,
-            timer_minutes
+            started
+        )
+        VALUES (?, ?, ?, ?, ?, ?)
+        """, (
+            exam_name,
+            subject,
+            total_marks,
+            timer_minutes,
+            enable_timer,
+            0
         ))
 
         conn.commit()
@@ -251,6 +227,7 @@ def create_exam():
         return redirect(f"/upload-questions/{exam_id}")
 
     return render_template("create_exam.html")
+
 # -------------------------------------------------
 # UPLOAD QUESTIONS (OLD UI)
 # -------------------------------------------------
