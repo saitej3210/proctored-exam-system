@@ -36,7 +36,7 @@ def init_db():
     conn = get_db()
     cur = conn.cursor()
 
-    # Create exams table (FULL + SAFE)
+    # EXAMS TABLE (FULL & FINAL)
     cur.execute("""
     CREATE TABLE IF NOT EXISTS exams (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -45,15 +45,28 @@ def init_db():
         total_marks INTEGER,
         timer_minutes INTEGER,
         enable_timer INTEGER DEFAULT 0,
-        started INTEGER DEFAULT 0,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+    """)
+
+    # QUESTIONS TABLE
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS questions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        exam_id INTEGER,
+        question TEXT,
+        option_a TEXT,
+        option_b TEXT,
+        option_c TEXT,
+        option_d TEXT,
+        correct_option TEXT
     )
     """)
 
     conn.commit()
     conn.close()
 
-# run once on startup
+# RUN DB INIT ON START
 init_db()
 
 
