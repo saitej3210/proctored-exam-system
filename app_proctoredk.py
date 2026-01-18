@@ -157,6 +157,13 @@ def upload_questions(exam_id):
         cur = conn.cursor()
 
         for q in parsed_questions:
+
+            # 🛡️ SAFETY CHECK – skip broken questions
+            required_keys = ["question", "A", "B", "C", "D"]
+            if not all(k in q and q[k] for k in required_keys):
+                print("⚠️ Skipping invalid question:", q)
+                continue
+
             cur.execute("""
                 INSERT INTO questions
                 (exam_id, question, option_a, option_b, option_c, option_d)
