@@ -4,7 +4,7 @@ import os
 import sqlite3
 import pdfplumber
 from db import get_db
-
+from migrate_questions_table import *
 from flask import (
      Flask,
      request,
