@@ -3,7 +3,7 @@ import time
 import os
 import sqlite3
 import pdfplumber
-
+from db import init_db, migrate_questions_table
 from flask import (
     Flask,
     request,
@@ -21,7 +21,8 @@ from db import  migrate_questions_table
 # --------------------------------
 # Runtime DB usage (students, inserts, locks)
 # --------------------------------
-from database import get_db, insert_student, _db_lock , init_db
+from db import get_db
+                                 
 
 
 # --------------------------------
