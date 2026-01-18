@@ -16,13 +16,13 @@ from flask import (
 # --------------------------------
 # ONLY for init & migration
 # --------------------------------
-from db import  migrate_questions_table
+from db import init_db, migrate_questions_table
 
 # --------------------------------
 # Runtime DB usage (students, inserts, locks)
 # --------------------------------
 from db import get_db
-                                 
+
 
 
 # --------------------------------
