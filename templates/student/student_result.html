@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Exam Result</title>
+
+<style>
+*{
+    margin:0;
+    padding:0;
+    box-sizing:border-box;
+}
+
+html, body{
+    width:100%;
+    height:100%;
+    overflow:hidden;
+    font-family: "Segoe UI", Arial, sans-serif;
+    background: radial-gradient(circle at top, #1e3a8a, #020617);
+    color:white;
+}
+
+/* FULL CENTER WRAPPER */
+.wrapper{
+    position:fixed;
+    inset:0;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    z-index:10;
+}
+
+/* RESULT CARD */
+.card{
+    width:560px;
+    padding:55px;
+    border-radius:22px;
+    text-align:center;
+    background: linear-gradient(145deg,#020617,#1e293b);
+    box-shadow:
+        0 0 80px rgba(59,130,246,.9),
+        inset 0 0 40px rgba(0,0,0,.8);
+}
+
+/* SCORE */
+.score{
+    font-size:86px;
+    font-weight:900;
+    letter-spacing:4px;
+}
+
+/* TEXT */
+.subtitle{
+    margin-top:12px;
+    letter-spacing:4px;
+    opacity:.95;
+}
+
+.note{
+    margin-top:28px;
+    font-size:15px;
+    opacity:.85;
+}
+
+/* FIREWORK CANVAS */
+canvas{
+    position:fixed;
+    inset:0;
+    z-index:1;
+    pointer-events:none;
+}
+</style>
+</head>
+
+<body>
+
+<canvas id="fireworks"></canvas>
+
+<div class="wrapper">
+    <div class="card">
+        <div class="score">{{ correct }} / {{ total }}</div>
+        <div class="subtitle">RESULT DECLARED</div>
+        <div class="note">Congratulations on completing the exam</div>
+    </div>
+</div>
+
+<script>
+const canvas = document.getElementById("fireworks");
+const ctx = canvas.getContext("2d");
+
+function resize(){
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+}
+resize();
+window.addEventListener("resize", resize);
+
+let particles = [];
+
+function rand(min,max){ return Math.random()*(max-min)+min; }
+
+function firework(){
+    const x = rand(200, canvas.width-200);
+    const y = rand(150, canvas.height/2);
+    const colors = ["#60a5fa","#22c55e","#facc15","#a78bfa","#38bdf8"];
+
+    for(let i=0;i<140;i++){
+        particles.push({
+            x,y,
+            angle:Math.random()*Math.PI*2,
+            speed:rand(2,6),
+            alpha:1,
+            radius:2,
+            color:colors[Math.floor(Math.random()*colors.length)]
+        });
+    }
+}
+
+setInterval(firework, 1200);
+
+function animate(){
+    ctx.fillStyle="rgba(2,6,23,0.25)";
+    ctx.fillRect(0,0,canvas.width,canvas.height);
+
+    particles.forEach((p,i)=>{
+        p.x += Math.cos(p.angle)*p.speed;
+        p.y += Math.sin(p.angle)*p.speed;
+        p.alpha -= 0.015;
+
+        ctx.beginPath();
+        ctx.fillStyle = `rgba(${hex(p.color)},${p.alpha})`;
+        ctx.arc(p.x,p.y,p.radius,0,Math.PI*2);
+        ctx.fill();
+
+        if(p.alpha<=0) particles.splice(i,1);
+    });
+
+    requestAnimationFrame(animate);
+}
+
+function hex(h){
+    h=h.replace("#","");
+    return `${parseInt(h.substr(0,2),16)},${parseInt(h.substr(2,2),16)},${parseInt(h.substr(4,2),16)}`;
+}
+
+animate();
+</script>
+
+</body>
+</html>

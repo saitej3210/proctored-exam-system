@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Exam in Progress</title>
+    <style>
+        body {
+            background: #0f172a;
+            color: white;
+            font-family: Arial;
+        }
+        .container {
+            width: 90%;
+            margin: auto;
+        }
+        .mcq {
+            margin-top: 20px;
+            padding: 15px;
+            background: #1e293b;
+            border-radius: 8px;
+        }
+        label {
+            display: block;
+            margin: 6px 0;
+            cursor: pointer;
+        }
+        button {
+            padding: 10px 20px;
+            background: #22c55e;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>Exam in Progress</h2>
+
+    <form method="POST" action="/student/submit">
+        {% for q in questions %}
+        <div class="mcq">
+            <p><b>{{ q.question_no }}. {{ q.question_text }}</b></p>
+
+            <label>
+                <input type="radio" name="q{{ q.question_no }}" value="{{ q.option_a }}">
+                {{ q.option_a }}
+            </label>
+
+            <label>
+                <input type="radio" name="q{{ q.question_no }}" value="{{ q.option_b }}">
+                {{ q.option_b }}
+            </label>
+
+            <label>
+                <input type="radio" name="q{{ q.question_no }}" value="{{ q.option_c }}">
+                {{ q.option_c }}
+            </label>
+
+            <label>
+                <input type="radio" name="q{{ q.question_no }}" value="{{ q.option_d }}">
+                {{ q.option_d }}
+            </label>
+        </div>
+        {% endfor %}
+
+        <br>
+        <button type="submit">Submit Exam</button>
+    </form>
+</div>
+
+</body>
+</html>

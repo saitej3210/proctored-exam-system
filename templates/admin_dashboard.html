@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<title>Admin Dashboard</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='space.css') }}">
+</head>
+    <meta charset="UTF-8">
+    <title>Admin Dashboard</title>
+    <style>
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+            background: #0f172a;
+            color: white;
+        }
+        .header {
+            padding: 20px;
+            font-size: 24px;
+            font-weight: bold;
+            background: #020617;
+        }
+        .container {
+            padding: 30px;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 20px;
+        }
+        .card {
+            background: #020617;
+            border-radius: 12px;
+            padding: 30px;
+            text-align: center;
+            cursor: pointer;
+            transition: 0.3s;
+            border: 1px solid #1e293b;
+        }
+        .card:hover {
+            transform: translateY(-5px);
+            background: #020617;
+            border-color: #22c55e;
+        }
+        .card h2 {
+            margin: 15px 0 0;
+            font-size: 18px;
+        }
+        .icon {
+            font-size: 40px;
+        }
+        a {
+            text-decoration: none;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Admin Dashboard</title>
+
+<style>
+* {
+    box-sizing: border-box;
+    font-family: "Segoe UI", Arial, sans-serif;
+}
+
+body {
+    margin: 0;
+    min-height: 100vh;
+    background: radial-gradient(circle at top, #0f172a, #020617);
+    color: #e5e7eb;
+    display: flex;
+}
+
+/* SIDEBAR */
+.sidebar {
+    width: 260px;
+    background: rgba(255,255,255,0.05);
+    backdrop-filter: blur(12px);
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+}
+
+.sidebar h2 {
+    margin: 0 0 30px 0;
+    font-size: 22px;
+}
+
+.sidebar a {
+    text-decoration: none;
+    color: #e5e7eb;
+    padding: 14px 16px;
+    border-radius: 12px;
+    margin-bottom: 10px;
+    display: block;
+    transition: 0.25s;
+}
+
+.sidebar a:hover {
+    background: rgba(255,255,255,0.12);
+}
+
+/* MAIN */
+.main {
+    flex: 1;
+    padding: 40px;
+}
+
+/* HEADER */
+.header {
+    font-size: 28px;
+    font-weight: 700;
+    margin-bottom: 30px;
+}
+
+/* GRID */
+.grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 26px;
+}
+
+/* CARD */
+.card {
+    background: rgba(255,255,255,0.06);
+    border-radius: 22px;
+    padding: 30px;
+    text-align: center;
+    cursor: pointer;
+    box-shadow: 0 30px 70px rgba(0,0,0,0.45);
+    transition: 0.3s;
+}
+
+.card:hover {
+    transform: translateY(-6px);
+    background: rgba(255,255,255,0.1);
+}
+
+.card-icon {
+    font-size: 34px;
+    margin-bottom: 14px;
+}
+
+.card-title {
+    font-size: 16px;
+    font-weight: 600;
+}
+
+/* COLORS */
+.create { color: #60a5fa; }
+.upload { color: #22c55e; }
+.view   { color: #eab308; }
+.users  { color: #a78bfa; }
+.results{ color: #f472b6; }
+.logout { color: #ef4444; }
+</style>
+</head>
+
+<body>
+
+<!-- SIDEBAR -->
+<div class="sidebar">
+    <h2>🛡 Admin Panel</h2>
+
+    <a href="/admin-dashboard">🏠 Dashboard</a>
+    <a href="/create-exam">➕ Create Exam</a>
+    <a href="/upload-questions">📤 Upload Questions</a>
+    <a href="/admin/exams">📄 View Exams</a>
+    <a href="/admin/logout">🚪 Logout</a>
+</div>
+
+<!-- MAIN -->
+<div class="main">
+
+    <div class="header">Admin Dashboard</div>
+
+    <div class="grid">
+
+        <div class="card" onclick="location.href='/create-exam'">
+            <div class="card-icon create">➕</div>
+            <div class="card-title">Create New Exam</div>
+        </div>
+
+        <div class="card" onclick="location.href='/upload-questions'">
+            <div class="card-icon upload">📤</div>
+            <div class="card-title">Upload Questions</div>
+        </div>
+
+        <div class="card" onclick="location.href='/admin/exams'">
+            <div class="card-icon view">📄</div>
+            <div class="card-title">View Exams</div>
+        </div>
+
+        <div class="card" onclick="location.href='/admin/results'">
+            <div class="card-icon results">📊</div>
+            <div class="card-title">Results Overview</div>
+        </div>
+
+        <div class="card" onclick="location.href='/admin/students'">
+            <div class="card-icon users">👥</div>
+            <div class="card-title">Students</div>
+        </div>
+
+        <div class="card" onclick="location.href='/admin/logout'">
+            <div class="card-icon logout">🚪</div>
+            <div class="card-title">Logout</div>
+        </div>
+
+    </div>
+</div>
+
+</body>
+</html>
+

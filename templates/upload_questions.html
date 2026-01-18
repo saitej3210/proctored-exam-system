@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Upload Question PDF</title>
+
+    <style>
+        * {
+            box-sizing: border-box;
+            font-family: "Segoe UI", Arial, sans-serif;
+        }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            background: radial-gradient(circle at top, #0f172a, #020617);
+            color: #e5e7eb;
+            padding: 40px;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: auto;
+        }
+
+        h2 {
+            font-size: 28px;
+            margin-bottom: 6px;
+        }
+
+        .subtitle {
+            color: #94a3b8;
+            margin-bottom: 25px;
+        }
+
+        .card {
+            background: rgba(255,255,255,0.05);
+            border-radius: 18px;
+            padding: 28px;
+            box-shadow: 0 30px 80px rgba(0,0,0,0.45);
+            backdrop-filter: blur(12px);
+            margin-bottom: 25px;
+        }
+
+        .warning {
+            border-left: 4px solid #facc15;
+            background: rgba(250,204,21,0.08);
+            padding: 18px;
+            border-radius: 12px;
+        }
+
+        .warning h4 {
+            margin: 0 0 10px 0;
+            color: #fde047;
+        }
+
+        .format-box {
+            background: rgba(15,23,42,0.9);
+            border: 1px dashed #38bdf8;
+            border-radius: 12px;
+            padding: 18px;
+            font-family: monospace;
+            font-size: 14px;
+            white-space: pre-line;
+            margin-top: 12px;
+        }
+
+        ul {
+            margin-top: 15px;
+            padding-left: 20px;
+        }
+
+        li {
+            margin-bottom: 8px;
+            color: #cbd5f5;
+        }
+
+        .upload-group {
+            margin-top: 25px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #c7d2fe;
+        }
+
+        input[type="file"] {
+            width: 100%;
+            padding: 10px;
+            border-radius: 10px;
+            border: 1px solid rgba(255,255,255,0.15);
+            background: rgba(15,23,42,0.9);
+            color: #e5e7eb;
+        }
+
+        input[type="file"]::file-selector-button {
+            padding: 8px 14px;
+            border-radius: 8px;
+            border: none;
+            background: linear-gradient(135deg, #2563eb, #3b82f6);
+            color: white;
+            cursor: pointer;
+            margin-right: 12px;
+        }
+
+        .submit {
+            margin-top: 30px;
+            padding: 14px 22px;
+            border-radius: 14px;
+            border: none;
+            font-size: 15px;
+            font-weight: 700;
+            cursor: pointer;
+            background: linear-gradient(135deg, #22c55e, #4ade80);
+            color: #052e16;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.4);
+        }
+
+        .submit:hover {
+            transform: translateY(-2px);
+        }
+    </style>
+</head>
+
+<body>
+
+<div class="container">
+
+    <h2>📄 Upload Question PDF</h2>
+    <div class="subtitle">
+        Upload MCQ question paper for this exam
+    </div>
+
+    <div class="card warning">
+        <h4>⚠ Important – PDF Format Instructions</h4>
+        Question PDF must strictly follow the format below.
+        Any deviation may cause parsing failure.
+
+        <div class="format-box">
+1. What is the value of π (approx)?
+a) 2.14
+b) 3.14
+c) 4.13
+d) 3.41
+
+2. The square of 12 is:
+a) 124
+b) 144
+c) 132
+d) 122
+        </div>
+
+        <ul>
+            <li>Questions must be numbered (1, 2, 3…)</li>
+            <li>Options must be lowercase: a), b), c), d)</li>
+            <li>One question per block</li>
+            <li>No images inside questions</li>
+            <li>Other formats like A., (a), bullets, tables are NOT supported</li>
+        </ul>
+    </div>
+
+    <form method="POST" enctype="multipart/form-data">
+
+        <div class="card upload-group">
+            <label>Upload Question PDF</label>
+            <input type="file" name="question_pdf" required>
+
+            <div style="height:20px"></div>
+
+            <label>Upload Answer Key PDF (optional)</label>
+            <input type="file" name="answer_pdf">
+        </div>
+
+        <button class="submit">
+            ⬆ Upload & Continue
+        </button>
+
+    </form>
+
+</div>
+
+</body>
+</html>

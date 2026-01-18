@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Waiting for Results</title>
+    <style>
+        body {
+            background: #020617;
+            color: white;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            font-family: Arial;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+
+<div>
+    <h2>⏳ Please wait</h2>
+    <p>Admin has not released results yet</p>
+</div>
+
+<script>
+    setInterval(() => {
+        fetch("/student/check-results_status")
+            .then(res => res.json())
+            .then(data => {
+                if (data.released === true) {
+                    window.location.href = "/student/result";
+                }
+            });
+    }, 3000); // every 3 seconds
+</script>
+<script>
+const EXAM_ID = {{ exam_id }};
+
+setInterval(async () => {
+  const r = await fetch(`/exam/status/${EXAM_ID}`);
+  const d = await r.json();
+
+  if (d.status === "RUNNING") {
+    location.replace(`/student/exam/${EXAM_ID}`);
+  }
+
+  if (d.status === "REMOVED") {
+    location.replace("/student/login");
+  }
+}, 3000);
+</script>
+</body>
+</html>

@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Exam Control Panel</title>
+
+<style>
+*{box-sizing:border-box;font-family:"Segoe UI",Arial,sans-serif}
+body{
+  margin:0;min-height:100vh;
+  background:radial-gradient(circle at top,#0f172a,#020617);
+  color:#e5e7eb;padding:40px
+}
+.panel{max-width:1100px;margin:auto}
+.actions{display:flex;gap:15px;margin-bottom:30px;flex-wrap:wrap}
+.btn{
+  padding:12px 20px;border-radius:10px;border:none;
+  font-size:14px;font-weight:600;cursor:pointer
+}
+.start{background:#2563eb;color:white}
+.release{background:#22c55e;color:#052e16}
+.results{background:#facc15;color:#422006}
+
+.card{background:rgba(255,255,255,.05);border-radius:16px;padding:25px}
+table{width:100%;border-collapse:collapse}
+th,td{padding:14px 16px}
+th{font-size:13px;text-transform:uppercase;color:#cbd5f5}
+
+.status{
+  padding:6px 12px;border-radius:999px;
+  font-size:12px;font-weight:600
+}
+.pending{background:rgba(234,179,8,.2);color:#fde047}
+.approved{background:rgba(34,197,94,.2);color:#4ade80}
+.submitted{background:rgba(59,130,246,.2);color:#93c5fd}
+.paused{background:rgba(239,68,68,.2);color:#fca5a5}
+
+.action-btn{
+  padding:6px 12px;border-radius:8px;
+  border:none;font-size:12px;cursor:pointer;margin-right:6px
+}
+.approve{background:#22c55e;color:#052e16}
+.danger{background:#ef4444;color:white}
+</style>
+</head>
+<script>
+let lastSnapshot = null;
+
+async function pollAdminStatus() {
+  try {
+    const res = await fetch(window.location.href, {
+      headers: { "X-Requested-With": "XMLHttpRequest" }
+    });
+
+    const text = await res.text();
+
+    if (lastSnapshot === null) {
+      lastSnapshot = text;
+      return;
+    }
+
+    // 🔄 reload only if content changed
+    if (text !== lastSnapshot) {
+      location.reload();
+    }
+  } catch (e) {
+    console.error("Admin polling error", e);
+  }
+}
+
+// ⏱ poll every 3 seconds
+setInterval(pollAdminStatus, 3000);
+</script>
+<body>
+<div class="panel">
+
+<h2>🛡 Exam Control Panel</h2>
+
+<div class="actions">
+<form method="POST" action="/admin/exam/{{ exam_id }}/start">
+<button class="btn start">🚀 Start Exam</button>
+</form>
+
+<form method="POST" action="/admin/exam/{{ exam_id }}/release_results">
+<button class="btn release">🎉 Release Results</button>
+</form>
+
+<a href="/admin/exam/{{ exam_id }}/results">
+<button class="btn results">📊 View Results</button>
+</a>
+</div>
+
+<div class="card">
+<h3>👥 Students</h3>
+
+<table>
+<thead>
+<tr>
+<th>Roll No</th>
+<th>Name</th>
+<th>Status</th>
+<th>Action</th>
+</tr>
+</thead>
+
+<tbody>
+{% for s in students %}
+<tr>
+<td>{{ s.roll }}</td>
+<td>{{ s.name }}</td>
+
+<td>
+{% if s.exam_status == "PAUSED" %}
+<span class="status paused">paused</span>
+{% else %}
+<span class="status {{ s.student_status }}">{{ s.student_status }}</span>
+{% endif %}
+</td>
+
+<td>
+
+  {% if s.student_status == "pending" %}
+  <form method="POST"
+        action="/admin/student/{{ exam_id }}/{{ s.roll }}/approve"
+        style="display:inline;">
+    <button class="action-btn approve">Approve</button>
+  </form>
+  {% endif %}
+
+  {% if s.exam_status == "PAUSED" %}
+  <form method="POST"
+        action="/admin/exam/{{ exam_id }}/resume/{{ s.roll }}"
+        style="display:inline;">
+    <button class="action-btn approve">Resume</button>
+  </form>
+  {% endif %}
+
+  <form method="POST"
+        action="/admin/remove-student/{{ exam_id }}/{{ s.roll }}"
+        style="display:inline;">
+    <button class="action-btn danger">Remove</button>
+  </form>
+
+</td>
+</tr>
+{% endfor %}
+</tbody>
+</table>
+</div>
+</div>
+</body>
+</html>

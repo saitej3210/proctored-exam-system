@@ -1,0 +1,7 @@
+
+database.db
+exam.db
+proctored.db
+__pycache__/
+*.sqbpro
+.env

@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Exam {{ exam_id }} Results</title>
+    <style>
+        body {
+            background: #0f172a;
+            color: #e5e7eb;
+            font-family: Arial, sans-serif;
+            padding: 40px;
+        }
+        table {
+            width: 80%;
+            margin: auto;
+            border-collapse: collapse;
+        }
+        th, td {
+            border: 1px solid #334155;
+            padding: 10px;
+            text-align: center;
+        }
+        th {
+            background: #020617;
+        }
+        h1 {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        button {
+            padding: 6px 12px;
+            background: #22c55e;
+            border: none;
+            color: #022c22;
+            border-radius: 6px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+
+<h1>Results – Exam {{ exam_id }}</h1>
+
+<table class="results-table">
+  <thead>
+    <tr>
+      <th>Roll No</th>
+      <th>Name</th>
+      <th>Correct</th>
+      <th>Total</th>
+      <th>Marks</th>
+      <th>Action</th>
+    </tr>
+  </thead>
+
+  <tbody>
+    {% for student in results %}
+    <tr>
+      <td>{{ student.roll }}</td>
+      <td>{{ student.name }}</td>
+      <td>{{ student.correct }}</td>
+      <td>{{ student.total }}</td>
+      <td>{{ student.marks }}</td>
+      <td>
+        <button onclick="resumeExam('{{ student.roll }}', {{ exam_id }})">
+          Resume Exam
+        </button>
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+<script>
+function resumeExam(roll, examId) {
+  fetch("/exam/resume", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({
+      roll: roll,
+      exam_id: examId
+    })
+  }).then(() => alert("Exam Resumed"));
+}
+</script>
+
+</body>
+</html>

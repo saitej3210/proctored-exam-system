@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Student Login</title>
+
+    <style>
+        body {
+            margin: 0;
+            height: 100vh;
+            background: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-family: Arial, sans-serif;
+            color: white;
+        }
+
+        .login-card {
+            background: rgba(255,255,255,0.1);
+            padding: 30px;
+            border-radius: 10px;
+            width: 320px;
+            text-align: center;
+        }
+
+        input {
+            width: 100%;
+            padding: 12px;
+            margin: 10px 0;
+            border-radius: 6px;
+            border: none;
+            outline: none;
+        }
+
+        button {
+            width: 100%;
+            padding: 12px;
+            background: #22c55e;
+            border: none;
+            border-radius: 6px;
+            font-size: 16px;
+            cursor: pointer;
+            color: #022c22;
+        }
+
+        button:hover {
+            background: #16a34a;
+        }
+    </style>
+</head>
+<body>
+
+<div class="login-card">
+    <h2>Student Login</h2>
+
+  <form method="POST" action="/student/login">
+
+    <input
+        type="text"
+        name="roll"
+        placeholder="Roll No"
+        required
+    >
+
+    <input
+        type="text"
+        name="name"
+        placeholder="Name"
+        required
+    >
+
+    <!-- 🔥 THIS WAS MISSING -->
+    <input
+        type="number"
+        name="exam_id"
+        placeholder="Exam ID"
+        required
+    >
+
+    {% if error %}
+        <p style="color:#ef4444; margin-top:10px;">
+            {{ error }}
+        </p>
+    {% endif %}
+
+    <button type="submit">Login</button>
+
+</form>
+</div>
+
+</body>
+</html>

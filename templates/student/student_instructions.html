@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Exam Instructions</title>
+
+    <style>
+        * {
+            box-sizing: border-box;
+            font-family: Arial, sans-serif;
+        }
+
+        body {
+            margin: 0;
+            height: 100vh;
+            background: radial-gradient(circle at top, #1e1e1e, #000);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #fff;
+        }
+
+        .card {
+            background: #111;
+            padding: 45px;
+            width: 480px;
+            border-radius: 12px;
+            box-shadow: 0 0 35px rgba(0,0,0,0.85);
+        }
+
+        h2 {
+            text-align: center;
+            margin-bottom: 25px;
+            font-weight: 600;
+            letter-spacing: 1px;
+        }
+
+        ul {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        ul li {
+            padding: 10px 0;
+            font-size: 14px;
+            color: #ccc;
+            border-bottom: 1px solid #222;
+        }
+
+        ul li:last-child {
+            border-bottom: none;
+        }
+
+        .note {
+            margin-top: 18px;
+            font-size: 13px;
+            color: #888;
+            text-align: center;
+        }
+
+        button {
+            width: 100%;
+            margin-top: 30px;
+            padding: 12px;
+            border: none;
+            border-radius: 6px;
+            background: #2a2a2a;
+            color: #fff;
+            font-size: 15px;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+
+        button:hover {
+            background: #3a3a3a;
+        }
+
+        .user {
+            margin-top: 18px;
+            text-align: center;
+            font-size: 13px;
+            color: #777;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="card">
+        <h2>Exam Instructions</h2>
+
+        <ul>
+            <li>✔ Full screen mode is mandatory</li>
+            <li>✔ Tab switching is not allowed</li>
+            <li>✔ Camera & microphone may be monitored</li>
+            <li>✔ Auto-save is enabled</li>
+            <li>✔ Any suspicious activity is logged</li>
+            <li>✔ Exam will auto-submit if time ends</li>
+        </ul>
+
+        <div class="note">
+            Please read all instructions carefully before starting.
+        </div>
+
+        <form method="POST" action="/student/start-exam">
+            <button type="submit">Start Exam</button>
+        </form>
+
+        <div class="user">
+            Logged in as<br>
+            <b>{{ name }} ({{ roll }})</b>
+        </div>
+    </div>
+</body>
+</html>

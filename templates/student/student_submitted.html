@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Submitted</title>
+    <style>
+        body {
+            background: #0b1d3a;
+            color: white;
+            font-family: Arial;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+
+    <div>
+        <h1>✅ Exam Submitted</h1>
+        <p>Please wait for admin to release results</p>
+        <p>⏳ Checking...</p>
+    </div>
+
+    <script>
+        setInterval(() => {
+            fetch("/student/student_results_html")
+                .then(r => {
+                    if (r.redirected) {
+                        window.location.href = r.url;
+                    }
+                });
+        }, 3000);
+    </script>
+
+</body>
+</html>

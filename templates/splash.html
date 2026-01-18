@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>ProctoredK</title>
+
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/splash.css') }}">
+
+    <script>
+        setTimeout(() => {
+            window.location.href = "/login";
+        }, 2500);
+    </script>
+</head>
+
+<body>
+    <div class="splash">
+        <div class="logo">
+            <img src="{{ url_for('static', filename='img/logo.png') }}" alt="ProctoredK Logo">
+            <h1>ProctoredK</h1>
+            <p>Secure Online Examination System</p>
+        </div>
+    </div>
+</body>
+</html>
