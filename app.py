@@ -34,6 +34,9 @@ DB_PATH = os.path.join(BASE_DIR, "database.db")
 def init_db():
     conn = sqlite3.connect(DB_PATH, check_same_thread=False)
     cur = conn.cursor()
+    # 🚨 FORCE RESET (TEMPORARY)
+    cur.execute("DROP TABLE IF EXISTS exams")
+    cur.execute("DROP TABLE IF EXISTS questions")
 
     cur.execute("""
     CREATE TABLE IF NOT EXISTS exams (
@@ -49,7 +52,7 @@ def init_db():
     """)
 
     cur.execute("""
-    CREATE TABLE IF NOT EXISTS questions (
+    CREATE TABLE  questions (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         exam_id INTEGER,
         question TEXT,
