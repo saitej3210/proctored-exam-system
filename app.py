@@ -5,12 +5,12 @@ import sqlite3
 import pdfplumber
 
 from flask import (
-    Flask,
-    request,
-    redirect,
-    render_template,
-    session,
-    send_from_directory
+     Flask,
+     request,
+     redirect,
+     render_template,
+     session,
+     send_from_directory
 )
 
 from database import get_db, insert_student, _db_lock
@@ -69,7 +69,6 @@ app = Flask(__name__, template_folder="templates")
 app.secret_key = os.environ.get("SECRET_KEY", "fallback-secret")
 
 # 🔥 VERY IMPORTANT: call AFTER app creation
-init_db()
 # -------------------------------------------------
 # APP INIT
 # -------------------------------------------------
