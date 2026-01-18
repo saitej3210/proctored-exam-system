@@ -35,7 +35,6 @@ app.secret_key = os.environ.get("SECRET_KEY", "fallback-secret")
 # APP START (RUN ONCE)
 # --------------------------------
 with app.app_context():
-    init_db()
     migrate_questions_table()
 
 
@@ -49,38 +48,7 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 # --------------------------------
 # DB INIT (DO NOT DELETE)
 # --------------------------------
-def init_db():
-    conn = get_db()
-    cur = conn.cursor()
 
-    cur.execute("""
-    CREATE TABLE IF NOT EXISTS exams (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        exam_name TEXT,
-        subject TEXT,
-        total_marks INTEGER,
-        timer_minutes INTEGER,
-        enable_timer INTEGER DEFAULT 0,
-        started INTEGER DEFAULT 0,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    )
-    """)
-
-    cur.execute("""
-    CREATE TABLE IF NOT EXISTS questions (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        exam_id INTEGER,
-        question TEXT,
-        option_a TEXT,
-        option_b TEXT,
-        option_c TEXT,
-        option_d TEXT,
-        correct_answer TEXT
-    )
-    """)
-
-    conn.commit()
-    conn.close()
 
 # --------------------------------
 # HOME (OLD UI)
