@@ -52,48 +52,40 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 # DB INIT
 # -------------------------------------------------
 
-def init_db():
-    conn = sqlite3.connect(DB_PATH, check_same_thread=False)
-    cur = conn.cursor()
+import sqlite3
 
-    # 🔥 FORCE RESET (TEMP)
-    cur.execute("DROP TABLE IF EXISTS exams")
-    cur.execute("DROP TABLE IF EXISTS questions")
+conn = sqlite3.connect("database_v2.db")
+cur = conn.cursor()
 
-    # ✅ CREATE EXAMS
-    cur.execute("""
-    CREATE TABLE exams (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        exam_name TEXT,
-        subject TEXT,
-        total_marks INTEGER,
-        timer_minutes INTEGER,
-        enable_timer INTEGER DEFAULT 0,
-        started INTEGER DEFAULT 0,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    )
-    """)
+cur.execute("""
+CREATE TABLE IF NOT EXISTS exams (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    exam_name TEXT,
+    subject TEXT,
+    total_marks INTEGER,
+    timer_minutes INTEGER,
+    enable_timer INTEGER DEFAULT 0,
+    started INTEGER DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+)
+""")
 
-    # ✅ CREATE QUESTIONS
-    cur.execute("""
-    CREATE TABLE questions (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        exam_id INTEGER,
-        question TEXT,
-        option_a TEXT,
-        option_b TEXT,
-        option_c TEXT,
-        option_d TEXT,
-        correct_answer TEXT
-    )
-    """)
+cur.execute("""
+CREATE TABLE IF NOT EXISTS questions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    exam_id INTEGER,
+    question TEXT,
+    option_a TEXT,
+    option_b TEXT,
+    option_c TEXT,
+    option_d TEXT,
+    correct_answer TEXT
+)
+""")
 
-    conn.commit()
-    conn.close()
-
-
-
-init_db()    
+conn.commit()
+conn.close()
+print("DB READY")   
 
 # -------------------------------------------------
 # HOME (OLD UI)
@@ -143,20 +135,21 @@ def create_exam():
         total_marks = int(request.form.get("total_marks", 0))
 
         enable_timer = 1 if request.form.get("enable_timer") else 0
-        timer_minutes = int(request.form.get("timer_minutes") or 0)
+        timer_minutes = request.form.get("timer_minutes")
+        timer_minutes = int(timer_minutes) if timer_minutes else 0
 
-        conn = sqlite3.connect(DB_PATH, check_same_thread=False)
+        conn = get_db()
         cur = conn.cursor()
 
         cur.execute("""
-            INSERT INTO exams (
-                exam_name,
-                subject,
-                total_marks,
-                timer_minutes,
-                enable_timer,
-                started
-            ) VALUES (?, ?, ?, ?, ?, ?)
+        INSERT INTO exams (
+            exam_name,
+            subject,
+            total_marks,
+            timer_minutes,
+            enable_timer,
+            started
+        ) VALUES (?, ?, ?, ?, ?, ?)
         """, (
             exam_name,
             subject,
