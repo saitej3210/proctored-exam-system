@@ -29,6 +29,16 @@ DB_PATH = os.path.join(BASE_DIR, "database.db")
 
 conn = sqlite3.connect(DB_PATH, check_same_thread=False)
 cur = conn.cursor()
+# --- AUTO MIGRATION: add enable_timer column if missing ---
+try:
+    cur.execute("ALTER TABLE exams ADD COLUMN enable_timer INTEGER DEFAULT 0")
+    conn.commit()
+    print("enable_timer column added")
+except sqlite3.OperationalError as e:
+    if "duplicate column name" in str(e):
+        pass  # column already exists
+    else:
+        raise
 # -------------------------------
 # AUTO DB MIGRATION (RENDER SAFE)
 # -------------------------------
