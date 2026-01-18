@@ -116,9 +116,20 @@ def migrate_questions_table():
 
 
 def migrate_students_table():
-    # students table already stable – kept for future safety
-    pass
+    with _db_lock:
+        conn = get_db()
+        cur = conn.cursor()
 
+        cur.execute("PRAGMA table_info(students)")
+        cols = [row[1] for row in cur.fetchall()]
+
+        if "removed" not in cols:
+            cur.execute(
+                "ALTER TABLE students ADD COLUMN removed INTEGER DEFAULT 0"
+            )
+
+        conn.commit()
+        conn.close()
 
 def migrate_exam_sessions_table():
     with _db_lock:
