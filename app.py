@@ -52,17 +52,15 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 # DB INIT
 # -------------------------------------------------
 
-
-
 def init_db():
     conn = sqlite3.connect(DB_PATH, check_same_thread=False)
     cur = conn.cursor()
 
-    # 🔥 TEMP RESET (ONLY NOW)
+    # 🔥 FORCE RESET (TEMP)
     cur.execute("DROP TABLE IF EXISTS exams")
     cur.execute("DROP TABLE IF EXISTS questions")
 
-    # ✅ CREATE exams
+    # ✅ CREATE EXAMS
     cur.execute("""
     CREATE TABLE exams (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -76,7 +74,7 @@ def init_db():
     )
     """)
 
-    # ✅ CREATE questions
+    # ✅ CREATE QUESTIONS
     cur.execute("""
     CREATE TABLE questions (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -92,6 +90,8 @@ def init_db():
 
     conn.commit()
     conn.close()
+
+
 
 init_db()    
 
@@ -143,21 +143,20 @@ def create_exam():
         total_marks = int(request.form.get("total_marks", 0))
 
         enable_timer = 1 if request.form.get("enable_timer") else 0
-        timer_minutes = request.form.get("timer_minutes")
-        timer_minutes = int(timer_minutes) if timer_minutes else 0
+        timer_minutes = int(request.form.get("timer_minutes") or 0)
 
-        conn = get_db()
+        conn = sqlite3.connect(DB_PATH, check_same_thread=False)
         cur = conn.cursor()
 
         cur.execute("""
-        INSERT INTO exams (
-            exam_name,
-            subject,
-            total_marks,
-            timer_minutes,
-            enable_timer,
-            started
-        ) VALUES (?, ?, ?, ?, ?, ?)
+            INSERT INTO exams (
+                exam_name,
+                subject,
+                total_marks,
+                timer_minutes,
+                enable_timer,
+                started
+            ) VALUES (?, ?, ?, ?, ?, ?)
         """, (
             exam_name,
             subject,
