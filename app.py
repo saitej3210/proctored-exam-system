@@ -29,6 +29,29 @@ DB_PATH = os.path.join(BASE_DIR, "database.db")
 
 conn = sqlite3.connect(DB_PATH, check_same_thread=False)
 cur = conn.cursor()
+# -------------------------------
+# AUTO DB MIGRATION (RENDER SAFE)
+# -------------------------------
+
+cur.execute("""
+CREATE TABLE IF NOT EXISTS exams (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    exam_name TEXT,
+    subject TEXT,
+    total_marks INTEGER,
+    timer_minutes INTEGER,
+    enable_timer INTEGER DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+)
+""")
+conn.commit()
+
+# add column if missing (old DB fix)
+try:
+    cur.execute("ALTER TABLE exams ADD COLUMN enable_timer INTEGER DEFAULT 0")
+    conn.commit()
+except Exception:
+    pass
 # -------------------------------------------------
 # APP INIT
 # -------------------------------------------------
