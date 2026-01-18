@@ -1,0 +1,6 @@
+flask
+gunicorn
+pytesseract
+Pillow
+PyPDF2
+pdfplumber
