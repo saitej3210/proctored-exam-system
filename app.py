@@ -28,49 +28,23 @@ import sqlite3
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DB_PATH = os.path.join(BASE_DIR, "database.db")
 
-conn = sqlite3.connect(DB_PATH, check_same_thread=False)
-cur = conn.cursor()
 
-conn = sqlite3.connect(DB_PATH, check_same_thread=False)
-cur = conn.cursor()
 
-cur.execute("""
-CREATE TABLE IF NOT EXISTS exams (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    exam_name TEXT,
-    subject TEXT,
-    total_marks INTEGER,
-    timer_minutes INTEGER,
-    enable_timer INTEGER DEFAULT 0,
-    started INTEGER DEFAULT 0,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-)
-""")
-
-cur.execute("""
-CREATE TABLE IF NOT EXISTS questions (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    exam_id INTEGER,
-    question TEXT,
-    option_a TEXT,
-    option_b TEXT,
-    option_c TEXT,
-    option_d TEXT,
-    correct_answer TEXT
-)
-""")
-
-conn.commit()
 
 def init_db():
-    # 1️⃣ CREATE TABLES (SAFE)
+    conn = sqlite3.connect(DB_PATH, check_same_thread=False)
+    cur = conn.cursor()
+
     cur.execute("""
     CREATE TABLE IF NOT EXISTS exams (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         exam_name TEXT,
         subject TEXT,
         total_marks INTEGER,
-        timer_minutes INTEGER
+        timer_minutes INTEGER,
+        enable_timer INTEGER DEFAULT 0,
+        started INTEGER DEFAULT 0,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )
     """)
 
@@ -88,18 +62,8 @@ def init_db():
     """)
 
     conn.commit()
-
-    # 2️⃣ ADD MISSING COLUMNS (SAFE MIGRATION)
-    cur.execute("PRAGMA table_info(exams)")
-    columns = [c[1] for c in cur.fetchall()]
-
-    if "enable_timer" not in columns:
-        cur.execute("ALTER TABLE exams ADD COLUMN enable_timer INTEGER DEFAULT 0")
-
-    if "started" not in columns:
-        cur.execute("ALTER TABLE exams ADD COLUMN started INTEGER DEFAULT 0")
-
-    conn.commit()
+    conn.close()
+   
 
 # 🔥 VERY IMPORTANT
 init_db()
