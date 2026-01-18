@@ -4,7 +4,7 @@ import os
 import sqlite3
 import pdfplumber
 from db import get_db
-from migrate_questions_table import *
+from db import migrate_questions_table
 from flask import (
      Flask,
      request,
@@ -39,19 +39,23 @@ def get_db():
 
 
 # ---------------- APP INIT ----------------
+import os
+from flask import Flask
+
 app = Flask(__name__, template_folder="templates")
 app.secret_key = os.environ.get("SECRET_KEY", "fallback-secret")
+
+UPLOAD_FOLDER = "uploads"
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+
+migrate_questions_table()
+
 
 # 🔥 VERY IMPORTANT: call AFTER app creation
 # -------------------------------------------------
 # APP INIT
 # -------------------------------------------------
-app = Flask(__name__, template_folder="templates")
-import os
-app.secret_key = os.environ.get("SECRET_KEY", "fallback-secret")
 
-UPLOAD_FOLDER = "uploads"
-os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 # -------------------------------------------------
 # DB INIT
