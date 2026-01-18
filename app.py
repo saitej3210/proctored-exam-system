@@ -25,12 +25,58 @@ import pdfplumber
 import os
 import sqlite3
 
+# ===============================
+# DATABASE SETUP (SAFE & FINAL)
+# ===============================
+
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DB_PATH = os.path.join(BASE_DIR, "database.db")
 
+print("🔥 USING DB PATH:", DB_PATH)
+
+conn = sqlite3.connect(DB_PATH, check_same_thread=False)
+cur = conn.cursor()
+
+def ensure_column(table, column, col_type):
+    cur.execute(f"PRAGMA table_info({table})")
+    columns = [c[1] for c in cur.fetchall()]
+    if column not in columns:
+        cur.execute(f"ALTER TABLE {table} ADD COLUMN {column} {col_type}")
+        conn.commit()
+
+# ---- auto migrate exams table ----
+ensure_column("exams", "timer_minutes", "INTEGER")
+ensure_column("exams", "enable_timer", "INTEGER DEFAULT 0")
+ensure_column("exams", "started", "INTEGER DEFAULT 0")
+
+# ---- auto migrate questions table (safe) ----
+ensure_column("questions", "option_a", "TEXT")
+ensure_column("questions", "option_b", "TEXT")
+ensure_column("questions", "option_c", "TEXT")
+ensure_column("questions", "option_d", "TEXT")
+
+
 def ensure_columns():
+    # ---- exams table ----
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS exams (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        exam_name TEXT,
+        subject TEXT,
+        total_marks INTEGER,
+        timer_minutes INTEGER,
+        enable_timer INTEGER DEFAULT 0,
+        started INTEGER DEFAULT 0,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+    """)
+
+    # add missing columns safely
     cur.execute("PRAGMA table_info(exams)")
     cols = [c[1] for c in cur.fetchall()]
+
+    if "timer_minutes" not in cols:
+        cur.execute("ALTER TABLE exams ADD COLUMN timer_minutes INTEGER")
 
     if "enable_timer" not in cols:
         cur.execute("ALTER TABLE exams ADD COLUMN enable_timer INTEGER DEFAULT 0")
@@ -38,41 +84,25 @@ def ensure_columns():
     if "started" not in cols:
         cur.execute("ALTER TABLE exams ADD COLUMN started INTEGER DEFAULT 0")
 
-    if "timer_minutes" not in cols:
-        cur.execute("ALTER TABLE exams ADD COLUMN timer_minutes INTEGER")
+    # ---- questions table ----
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS questions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        exam_id INTEGER,
+        question TEXT,
+        option_a TEXT,
+        option_b TEXT,
+        option_c TEXT,
+        option_d TEXT,
+        correct_answer TEXT
+    )
+    """)
 
     conn.commit()
+    print("✅ DATABASE READY")
 
-conn = sqlite3.connect(DB_PATH, check_same_thread=False)
-cur = conn.cursor()
 
-cur.execute("""
-CREATE TABLE IF NOT EXISTS exams (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    exam_name TEXT,
-    subject TEXT,
-    total_marks INTEGER,
-    timer_minutes INTEGER,
-    enable_timer INTEGER DEFAULT 0,
-    started INTEGER DEFAULT 0,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-)
-""")
-
-cur.execute("""
-CREATE TABLE IF NOT EXISTS questions (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    exam_id INTEGER,
-    question TEXT,
-    option_a TEXT,
-    option_b TEXT,
-    option_c TEXT,
-    option_d TEXT,
-    correct_answer TEXT
-)
-""")
-ensure_columns
-conn.commit()
+ensure_columns()
 
 
 # ---------------- APP INIT ----------------
