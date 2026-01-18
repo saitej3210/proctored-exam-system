@@ -12,6 +12,7 @@ def get_db():
     conn.row_factory = sqlite3.Row
     return conn
 
+
 def init_db():
     with _db_lock:
         conn = get_db()
@@ -31,19 +32,10 @@ def init_db():
         """)
 
         cur.execute("""
-        CREATE TABLE IF NOT EXISTS students (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            exam_id INTEGER,
-            roll TEXT,
-            name TEXT,
-            status TEXT
-        )
-        """)
-
-        cur.execute("""
         CREATE TABLE IF NOT EXISTS questions (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             exam_id INTEGER,
+            question_no INTEGER,
             question TEXT,
             option_a TEXT,
             option_b TEXT,
@@ -56,6 +48,7 @@ def init_db():
         conn.commit()
         conn.close()
 
+
 def migrate_questions_table():
     with _db_lock:
         conn = get_db()
@@ -66,6 +59,9 @@ def migrate_questions_table():
 
         if "question_no" not in cols:
             cur.execute("ALTER TABLE questions ADD COLUMN question_no INTEGER")
+
+        if "correct_option" not in cols:
+            cur.execute("ALTER TABLE questions ADD COLUMN correct_option TEXT")
 
         conn.commit()
         conn.close()
