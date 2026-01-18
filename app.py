@@ -15,7 +15,14 @@ from flask import (
 
 from db import (
     init_db,
-    get_db
+    get_db,
+
+    # migrations (ONLY used at startup)
+    migrate_students_table,
+    migrate_results_table,
+    migrate_exam_sessions_table,
+    migrate_exams_table,
+    migrate_questions_table
 )
 # --------------------------------
 # ONLY for init & migration
@@ -38,11 +45,12 @@ app.secret_key = os.environ.get("SECRET_KEY", "fallback-secret")
 # 🔥 RUN ONCE AT START
 with app.app_context():
     init_db()
-   #migrate_questions_table()
+
     migrate_students_table()
-   #migrate_exam_sessions_table()
-   #migrate_results_table()
-   #migrate_exams_table()
+    migrate_results_table()
+    migrate_exam_sessions_table()
+    migrate_exams_table()
+    migrate_questions_table()
 
 # --------------------------------
 # Uploads
