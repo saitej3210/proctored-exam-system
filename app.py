@@ -16,7 +16,7 @@ from flask import (
 # --------------------------------
 # ONLY for init & migration
 # --------------------------------
-from db import init_db, migrate_questions_table
+from db import  migrate_questions_table
 
 # --------------------------------
 # Runtime DB usage (students, inserts, locks)
@@ -81,7 +81,6 @@ def init_db():
 
     conn.commit()
     conn.close()
-
 
 # --------------------------------
 # HOME (OLD UI)
