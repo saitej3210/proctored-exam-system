@@ -1,5 +1,8 @@
 flask
 gunicorn
+numpy
+opencv-python-headless
+mediapipe
 pytesseract
 Pillow
 PyPDF2
