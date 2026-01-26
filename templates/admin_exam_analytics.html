@@ -1,0 +1,806 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Exam Analytics</title>
+
+  <!-- 🔥 FIX FOR DONUT CHART VISIBILITY -->
+  <style>
+    
+    .mini-grid{
+      display:grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap:20px;
+    }
+
+    .mini-card{
+      background:#0f172a;
+      padding:15px;
+      border-radius:12px;
+      text-align:center;
+      height:180px; /* 🔴 VERY IMPORTANT */
+    }
+
+    .mini-card canvas{
+      width:100% !important;
+      height:120px !important; /* 🔴 VERY IMPORTANT */
+    }
+    .mini-card{
+  background: linear-gradient(180deg,#0f172a,#020617);
+  border:1px solid rgba(148,163,184,.15);
+  box-shadow:0 12px 30px rgba(0,0,0,.45);
+  transition:transform .2s ease, box-shadow .2s ease;
+}
+
+.mini-card:hover{
+  transform:translateY(-4px);
+  box-shadow:0 18px 45px rgba(0,0,0,.55);
+}
+
+.mini-card p{
+  margin:0 0 10px;
+  font-size:14px;
+  font-weight:600;
+  color:#e5e7eb;
+  letter-spacing:.3px;
+}
+
+.mini-card canvas{
+  display:block;
+  margin:auto;
+  filter:drop-shadow(0 0 6px rgba(148,163,184,.25));
+}
+
+.mini-grid{
+  background:linear-gradient(
+    180deg,
+    rgba(255,255,255,.02),
+    rgba(255,255,255,0)
+  );
+  padding:20px;
+  border-radius:16px;
+}
+
+.mini-card.zero{
+  opacity:.45;
+  filter:grayscale(1);
+}
+  </style>
+
+
+</head>
+
+
+
+
+<style>
+
+  
+/* ================= BASE (UNCHANGED) ================= */
+*{box-sizing:border-box;font-family:"Segoe UI",Arial}
+body{
+  margin:0;
+  min-height:100vh;
+  background:radial-gradient(circle at top,#0f172a,#020617);
+  color:#e5e7eb;
+  padding:40px
+}
+.panel{max-width:1100px;margin:auto}
+
+/* HEADER */
+.top{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  margin-bottom:30px
+}
+.back{
+  color:#93c5fd;
+  text-decoration:none;
+  font-weight:600
+}
+
+/* STATS */
+.stats{
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(200px,1fr));
+  gap:20px;
+  margin-bottom:30px
+}
+.stat{
+  background:rgba(255,255,255,.05);
+  padding:22px;
+  border-radius:16px;
+  text-align:center
+}
+.stat h3{
+  margin:0;
+  font-size:13px;
+  color:#cbd5f5;
+  letter-spacing:1px
+}
+.stat p{
+  margin:12px 0 0;
+  font-size:28px;
+  font-weight:800
+}
+
+/* CARD */
+.card{
+  background:rgba(255,255,255,.05);
+  border-radius:16px;
+  padding:25px;
+  margin-bottom:30px
+}
+
+/* TABLE */
+table{width:100%;border-collapse:collapse}
+th,td{padding:14px 16px;text-align:left}
+th{
+  font-size:13px;
+  text-transform:uppercase;
+  color:#cbd5f5
+}
+.rank{font-weight:800;color:#fde047}
+.score{font-weight:700;color:#4ade80}
+
+/* QUESTION CARDS */
+.qcards{
+  display:flex;
+  gap:20px;
+  flex-wrap:wrap;
+  margin-bottom:30px
+}
+.qcard{
+  flex:1;
+  min-width:300px;
+  background:rgba(255,255,255,.05);
+  border-radius:16px;
+  padding:22px
+}
+.qmeta{
+  margin-top:10px;
+  color:#94a3b8;
+  font-size:14px
+}
+
+/* ================= PROFESSIONAL UI ADDITIONS (SAFE) ================= */
+
+/* Card depth */
+.card, .stat, .qcard{
+  box-shadow:0 10px 30px rgba(0,0,0,.35);
+  backdrop-filter:blur(6px)
+}
+
+/* Table polish */
+thead tr{
+  background:rgba(255,255,255,.06)
+}
+tbody tr{
+  border-top:1px solid rgba(255,255,255,.05)
+}
+tbody tr:hover{
+  background:rgba(255,255,255,.04)
+}
+
+/* Section headers */
+.card h3{
+  margin-top:0;
+  margin-bottom:18px;
+  font-size:18px;
+  letter-spacing:.3px
+}
+
+/* Risk emphasis */
+td[style*="#ef4444"]{text-shadow:0 0 6px rgba(239,68,68,.4)}
+td[style*="#22c55e"]{text-shadow:0 0 6px rgba(34,197,94,.35)}
+td[style*="#facc15"]{text-shadow:0 0 6px rgba(250,204,21,.35)}
+
+/* Sticky header feel (without changing HTML) */
+.top{
+  position:sticky;
+  top:0;
+  background:rgba(2,6,23,.75);
+  backdrop-filter:blur(10px);
+  padding:15px 0;
+  z-index:10
+}
+
+/* Smooth */
+html{scroll-behavior:smooth}
+</style>
+</head>
+
+<div>
+  <a class="back" href="/admin/exam/{{ exam_id }}/export/csv">⬇ Download CSV</a>
+</div>
+<a class="back" href="/admin/exam/{{ exam_id }}/export/pdf">🧾 Download PDF</a>
+
+<body>
+<div class="panel">
+
+<!-- HEADER -->
+<div class="top">
+  <h2>📊 Exam Analytics</h2>
+  <a class="back" href="/admin/exam/{{ exam_id }}/control">← Back to Control</a>
+</div>
+
+<a class="back" href="/admin/exam/{{ exam_id }}/timeline">🕒 View Timeline Replay</a>
+
+<!-- STATS -->
+<div class="stats">
+  <div class="stat"><h3>STUDENTS</h3><p>{{ total_students }}</p></div>
+  <div class="stat"><h3>AVERAGE</h3><p>{{ average }}</p></div>
+  <div class="stat"><h3>HIGHEST</h3><p>{{ highest }}</p></div>
+  <div class="stat"><h3>LOWEST</h3><p>{{ lowest }}</p></div>
+</div>
+
+<!-- HARD / EASY -->
+<div class="qcards">
+  <div class="qcard">
+    <h3>🔥 Hardest Question</h3>
+    {% if hardest %}
+      <p><b>Q{{ hardest.question_no }}</b></p>
+      <p>{{ hardest.question }}</p>
+      <div class="qmeta">Correct Attempts: {{ hardest.correct_count }}</div>
+    {% else %}
+      <p class="qmeta">No data</p>
+    {% endif %}
+  </div>
+
+  <div class="qcard">
+    <h3>🎯 Easiest Question</h3>
+    {% if easiest %}
+      <p><b>Q{{ easiest.question_no }}</b></p>
+      <p>{{ easiest.question }}</p>
+      <div class="qmeta">Correct Attempts: {{ easiest.correct_count }}</div>
+    {% else %}
+      <p class="qmeta">No data</p>
+    {% endif %}
+  </div>
+</div>
+
+<!-- LEADERBOARD -->
+<div class="card">
+<h3>🏆 Leaderboard</h3>
+<table>
+<thead>
+<tr><th>Rank</th><th>Roll</th><th>Name</th><th>Score</th></tr>
+</thead>
+<tbody>
+{% for row in leaderboard %}
+<tr>
+  <td class="rank">#{{ loop.index }}</td>
+  <td>{{ row.roll }}</td>
+  <td>{{ row.name }}</td>
+  <td class="score">{{ row.marks }}</td>
+</tr>
+{% else %}
+<tr><td colspan="4" style="text-align:center;color:#94a3b8">No results</td></tr>
+{% endfor %}
+</tbody>
+</table>
+</div>
+
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Question-wise Analytics</title>
+    <style>
+        body {
+            background: #0f172a;
+            color: #e5e7eb;
+            font-family: Arial;
+            padding: 20px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        th, td {
+            padding: 12px;
+            text-align: left;
+        }
+        th {
+            background: #1e293b;
+        }
+        tr:nth-child(even) {
+            background: #111827;
+        }
+        .green { color: #22c55e; }
+        .red { color: #ef4444; }
+    </style>
+</head>
+<body>
+
+<h2>📊 Question-wise Analysis</h2>
+
+<table>
+    <thead>
+        <tr>
+            <th>Q No</th>
+            <th>Question</th>
+            <th>Attempts</th>
+            <th>Correct</th>
+            <th>Wrong</th>
+            <th>Accuracy</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for q in question_wise %}
+        <tr>
+            <td>#{{ q.question_no }}</td>
+            <td>{{ q.question }}</td>
+            <td>{{ q.attempts }}</td>
+            <td class="green">{{ q.correct }}</td>
+            <td class="red">{{ q.wrong }}</td>
+            <td>{{ q.accuracy }}%</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+</body>
+</html>
+<!-- QUESTION INTEGRITY ANALYSIS -->
+<div class="card">
+  <h3>🧪 Question Integrity Analysis</h3>
+  <table>
+    <thead>
+      <tr>
+        <th>Q.No</th>
+        <th>Question</th>
+        <th>Attempts</th>
+        <th>Correct</th>
+        <th>Wrong</th>
+        <th>Accuracy</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for q in question_integrity %}
+      <tr>
+        <td>{{ q.question_no }}</td>
+        <td>{{ q.question }}</td>
+        <td>{{ q.attempts }}</td>
+        <td style="color:green;font-weight:700">{{ q.correct }}</td>
+        <td style="color:red;font-weight:700">{{ q.wrong }}</td>
+        <td>{{ q.accuracy }}%</td>
+      </tr>
+      {% else %}
+      <tr>
+        <td colspan="6" style="text-align:center">No data</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+
+<style>
+.risk-grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(120px,1fr));
+  gap:14px;
+  margin-top:12px;
+  text-align:center;
+}
+.risk-grid canvas{
+  max-width:110px;
+  max-height:110px;
+  margin:auto;
+}
+.risk-grid p{
+  font-size:13px;
+  margin-top:6px;
+  opacity:.85;
+}
+</style>
+<!-- QUESTION CHART -->
+
+
+<canvas id="questionChart" height="120"></canvas>
+
+<script>
+const qData = {{ question_chart_data | tojson }};
+
+new Chart(document.getElementById("questionChart"), {
+  type: "bar",
+  data: {
+    labels: qData.map(q => q.label),
+    datasets: [
+      {
+        label: "Correct",
+        data: qData.map(q => q.correct)
+      },
+      {
+        label: "Wrong",
+        data: qData.map(q => q.wrong)
+      }
+    ]
+  }
+});
+</script>
+<!-- 🚨 VIOLATION ANALYTICS -->
+<div class="card">
+  <h3>🚨 Violation Analytics</h3>
+
+  <div class="stats">
+    <div class="stat">
+      <h3>TOTAL VIOLATIONS</h3>
+      <p>{{ total_violations }}</p>
+    </div>
+
+    <div class="stat">
+      <h3>TOP VIOLATOR</h3>
+      {% if top_violator %}
+        <p>{{ top_violator.roll }}</p>
+        <small style="color:#94a3b8">
+          {{ top_violator.name }} ({{ top_violator.count }})
+        </small>
+      {% else %}
+        <p>—</p>
+      {% endif %}
+    </div>
+  </div>
+
+  <table style="margin-top:25px;width:100%">
+    <thead>
+      <tr>
+        <th>Violation Type</th>
+        <th>Count</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% if violation_stats %}
+        {% for v in violation_stats %}
+        <tr>
+          <td>{{ v.event_type | upper }}</td>
+          <td style="color:#f87171;font-weight:700">{{ v.count }}</td>
+        </tr>
+        {% endfor %}
+      {% else %}
+        <tr>
+          <td colspan="2" style="text-align:center;color:#94a3b8">
+            No violations
+          </td>
+        </tr>
+      {% endif %}
+    </tbody>
+  </table>
+</div>
+  
+<!-- 🚨 VIOLATION DISTRIBUTION -->
+<div class="card">
+  <h3>🚨 Violation Distribution</h3>
+
+  <div class="mini-grid">
+
+    <div class="mini-card">
+      <p>Tab Switch</p>
+      <canvas id="tabSwitchChart"></canvas>
+    </div>
+
+    <div class="mini-card">
+      <p>Blur</p>
+      <canvas id="blurChart"></canvas>
+    </div>
+
+    <div class="mini-card">
+      <p>Copy</p>
+      <canvas id="copyChart"></canvas>
+    </div>
+
+    <div class="mini-card">
+      <p>Paste</p>
+      <canvas id="pasteChart"></canvas>
+    </div>
+
+    <div class="mini-card">
+      <p>Multiple Faces</p>
+      <canvas id="faceChart"></canvas>
+    </div>
+
+    <div class="mini-card">
+      <p>Mobile</p>
+      <canvas id="mobileChart"></canvas>
+    </div>
+
+  </div>
+</div>
+
+<!-- 👨‍🎓 STUDENT-WISE PERFORMANCE -->
+<div class="card">
+<h3>👨‍🎓 Student-wise Performance</h3>
+<table>
+  <thead>
+    <tr>
+      <th>Roll</th>
+      <th>Name</th>
+      <th>Score</th>
+      <th>Total</th>
+      <th>Violations</th>
+      
+    </tr>
+  </thead>
+
+ <tbody>
+{% for s in student_stats %}
+<tr>
+  <td>{{ s.roll }}</td>
+  <td>{{ s.name }}</td>
+  <td>{{ s.score }}</td>
+  <td>{{ s.total }}</td>
+
+  <td style="color:#f87171;font-weight:700">
+    {{ s.violations }}
+  </td>
+</tr>
+{% endfor %}
+</tbody>
+<!-- ============================= -->
+<!-- ✅ CHART.JS (LOAD ONCE) -->
+<!-- ============================= -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<!-- CHART SCRIPT – FINAL FIX -->
+<script>
+const eventData = {{ event_counts | tojson | safe }} || {};
+
+const SAFE = {
+  tab_switch: eventData.tab_switch || 0,
+  blur: eventData.blur || 0,
+  copy: eventData.copy || 0,
+  paste: eventData.paste || 0,
+  multiple_faces: eventData.multiple_faces || 0,
+  mobile_detected: eventData.mobile_detected || 0
+};
+
+/* 🔥 IMPORTANT FIX:
+   same id multiple times unte
+   LAST canvas ni pick cheyyali
+*/
+function getLastCanvas(id){
+  const list = document.querySelectorAll(`#${id}`);
+  return list.length ? list[list.length - 1] : null;
+}
+
+function drawChart(id, value, color){
+  const canvas = getLastCanvas(id);
+  if(!canvas) return;
+
+  const ctx = canvas.getContext("2d");
+
+  new Chart(ctx,{
+    type:"doughnut",
+    data:{
+      datasets:[{
+        data:[value, Math.max(1,value)],
+        backgroundColor:[color,"#1e293b"],
+        borderWidth:0
+      }]
+    },
+    options:{
+      responsive:true,
+      maintainAspectRatio:false,
+      cutout:"75%",
+      plugins:{
+        legend:{display:false},
+        tooltip:{enabled:false}
+      }
+    }
+  });
+}
+
+window.addEventListener("load", ()=>{
+  drawChart("tabSwitchChart", SAFE.tab_switch, "#22c55e");
+  drawChart("blurChart", SAFE.blur, "#16a34a");
+  drawChart("copyChart", SAFE.copy, "#facc15");
+  drawChart("pasteChart", SAFE.paste, "#f59e0b");
+  drawChart("faceChart", SAFE.multiple_faces, "#ef4444");
+  drawChart("mobileChart", SAFE.mobile_detected, "#dc2626");
+});
+</script>
+
+
+<!-- ⏱ TIME BASED QUESTION ANALYTICS -->
+<div class="card">
+<h3>⏱️ Time-Based Question Analysis</h3>
+<table>
+<thead>
+<tr>
+  <th>Q.No</th>
+  <th>Avg Time (sec)</th>
+  <th>Fastest</th>
+  <th>Slowest</th>
+  <th>Avg Duration</th>
+</tr>
+</thead>
+<tbody>
+{% for t in time_based_analysis %}
+<tr>
+  <td>Q{{ t.question_no }}</td>
+  <td>{{ t.avg_time_spent }}</td>
+  <td style="color:#22c55e">{{ t.fastest }}</td>
+  <td style="color:#ef4444">{{ t.slowest }}</td>
+  <td>{{ t.avg_duration }}</td>
+</tr>
+{% else %}
+<tr>
+  <td colspan="5" style="text-align:center;color:#94a3b8">
+    No time data available
+  </td>
+</tr>
+{% endfor %}
+</tbody>
+</table>
+</div>
+<!-- 🛡 PROCTORING INTELLIGENCE -->
+<div class="card">
+  <h3>🛡 Proctoring Intelligence</h3>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Roll</th>
+        <th>Name</th>
+        <th>Risk Score</th>
+        <th>Status</th>
+      </tr>
+    </thead>
+
+    <tbody>
+    {% for p in proctoring_insights %}
+      <tr>
+        <td>{{ p.roll }}</td>
+        <td>{{ p.name }}</td>
+        <td>{{ p.risk_score }}</td>
+
+        <td style="
+          font-weight:800;
+          color:{% if p.level=='HIGH' %}#ef4444
+                {% elif p.level=='MEDIUM' %}#facc15
+                {% else %}#22c55e{% endif %};
+        ">
+          {{ p.level }}
+
+          <!-- ⏸ MANUAL PAUSE (ALWAYS SHOW) -->
+          <button
+            onclick="pauseStudent({{ exam_id }}, {{ p.student_id }})"
+            style="
+              margin-left:10px;
+              background:#ef4444;
+              color:white;
+              padding:4px 8px;
+              border-radius:6px;
+              border:none;
+              cursor:pointer;
+            ">
+            ⏸ Pause
+          </button>
+        </td>
+      </tr>
+    {% else %}
+      <tr>
+        <td colspan="4" style="text-align:center;color:#94a3b8">
+          No proctoring insights
+        </td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<hr style="margin:30px 0;">
+
+<!-- ================= ADMIN CONTROLS ================= -->
+
+<h3>Admin Controls</h3>
+
+<button
+  onclick="resumeExam({{ exam_id }}, {{ paused_student_id }})"
+  {% if not paused_student_id %}disabled{% endif %}
+  style="
+    background:#22c55e;
+    color:white;
+    padding:10px 16px;
+    border:none;
+    border-radius:8px;
+    font-size:15px;
+    cursor:pointer;
+  ">
+  ▶️ Resume Exam for Student
+</button>
+
+<script>
+function resumeExam(examId, studentId) {
+  fetch(`/admin/exam/${examId}/resume/${studentId}`, {
+    method: "POST"
+  })
+  .then(() => location.reload());
+}
+</script>
+
+<hr style="margin:30px 0;">
+
+<!-- ================= PAUSED STUDENTS ================= -->
+
+<h3>⏸ Paused Students</h3>
+
+<table>
+  <thead>
+    <tr>
+      <th>Name</th>
+      <th>Roll No</th>
+      <th>Reason</th>
+      <th>Action</th>
+    </tr>
+  </thead>
+
+  <tbody>
+  {% for s in paused_students %}
+    <tr>
+      <td>{{ s.name }}</td>
+      <td>{{ s.roll }}</td>
+      <td>{{ s.reason or 'AUTO / MANUAL' }}</td>
+
+      <td>
+        <!-- ▶️ RESUME -->
+        <form
+          method="POST"
+          action="/admin/exam/{{ exam_id }}/resume/{{ s.student_id }}"
+          style="display:inline">
+          <button
+            style="
+              background:#22c55e;
+              color:white;
+              border:none;
+              padding:6px 10px;
+              border-radius:6px;
+              cursor:pointer;
+            ">
+            ▶️ Resume
+          </button>
+        </form>
+
+        <!-- ⏸ PAUSE (ALWAYS SHOW EVEN IF ALREADY PAUSED) -->
+        <form
+          method="POST"
+          action="/admin/pause/{{ exam_id }}/{{ s.student_id }}"
+          style="display:inline">
+          <button
+            style="
+              background:#ef4444;
+              color:white;
+              border:none;
+              padding:6px 10px;
+              border-radius:6px;
+              cursor:pointer;
+            ">
+            ⏸ Pause
+          </button>
+        </form>
+      </td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+
+<script>
+function pauseStudent(examId, studentId) {
+  fetch(`/admin/pause/${examId}/${studentId}`, {
+    method: "POST"
+  }).then(() => location.reload());
+}
+</script>
+<script>
+function requestCameraCheck(examId) {
+  fetch(`/admin/exam/${examId}/camera-request`, {
+    method: "POST"
+  }).then(() => location.reload());
+}
+</script>
+<script>
+/* 🔄 AUTO REFRESH */
+setInterval(() => window.location.reload(), 7000);
+</script>

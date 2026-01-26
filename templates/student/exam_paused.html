@@ -1,95 +1,49 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-  <meta charset="UTF-8">
   <title>Exam Paused</title>
-
   <style>
-    body {
-      background: #0f172a;
-      color: #e5e7eb;
-      font-family: "Segoe UI", system-ui, sans-serif;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      height: 100vh;
-      margin: 0;
+    body{
+      background:#020617;
+      color:#e5e7eb;
+      display:flex;
+      justify-content:center;
+      align-items:center;
+      height:100vh;
+      font-family:Segoe UI, sans-serif;
     }
-
-    .box {
-      text-align: center;
-      background: rgba(255,255,255,0.04);
-      padding: 36px 42px;
-      border-radius: 18px;
-      box-shadow: 0 30px 80px rgba(0,0,0,0.6);
+    .card{
+      background:#0f172a;
+      padding:30px;
+      border-radius:16px;
+      width:400px;
+      text-align:center;
     }
-
-    h2 {
-      margin-top: 0;
-      font-size: 26px;
-    }
-
-    p {
-      margin: 8px 0;
-      color: #cbd5f5;
-    }
-
-    #pauseTimer {
-      margin-top: 18px;
-      font-size: 18px;
-      font-weight: 700;
-      color: #f87171;
-    }
+    h2{ color:#f87171; }
   </style>
 </head>
-
 <body>
 
-<div class="box">
-  <h2>⏸ Exam Paused</h2>
-  <p>Rule violation detected</p>
-  <p>Waiting for admin approval…</p>
+</div>
 
-  <div id="pauseTimer">
-    ⏱ Time Left: <span id="pauseTime">--:--</span>
-  </div>
+<div class="card">
+  <h2>⏸ Exam Paused</h2>
+  <p>
+    Multiple violations detected.<br>
+    Please wait for admin approval to continue.
+  </p>
 </div>
 
 <script>
-const EXAM_ID = {{ exam_id }};
-
-/* ⏱ TIMER (keeps running) */
-setInterval(async () => {
-  const r = await fetch(`/exam/timer/${EXAM_ID}`);
-  const d = await r.json();
-  if (!d.enabled) return;
-
-  const sec = d.remaining_seconds;
-  const m = Math.floor(sec / 60);
-  const s = sec % 60;
-
-  document.getElementById("pauseTime").innerText =
-    `${m}:${s.toString().padStart(2,"0")}`;
-
-  if (sec <= 0) {
-    location.replace(`/student/exam/${EXAM_ID}`);
-  }
-}, 1000);
-
-/* 🔄 ADMIN DECISION */
-setInterval(async () => {
-  const r = await fetch(`/exam/status/${EXAM_ID}`);
-  const d = await r.json();
-
-  if (d.status === "RUNNING") {
-    location.replace(`/student/exam/${EXAM_ID}`);
-  }
-  if (d.status === "REMOVED") {
-    location.replace("/student/login");
-  }
-  if (d.status === "SUBMITTED") {
-    location.replace("/student/result");
-  }
+setInterval(() => {
+    fetch("/student/exam/resume-status")
+        .then(res => res.json())
+        .then(data => {
+            if (data.resumed === 1 && data.exam_id) {
+                // ✅ GUARANTEED exam_id
+                window.location.href = "/student/exam/" + data.exam_id;
+            }
+        });
 }, 2000);
 </script>
 

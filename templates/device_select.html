@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Select Device</title>
+    <style>
+        body {
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: #0f172a;
+            color: white;
+            font-family: Arial;
+        }
+        .box {
+            text-align: center;
+        }
+        button {
+            padding: 15px 30px;
+            margin: 10px;
+            font-size: 18px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+        }
+        .mobile { background: #22c55e; }
+        .desktop { background: #3b82f6; }
+    </style>
+</head>
+<body>
+    <div class="box">
+        <h2>Select your device</h2>
+        <form method="post">
+            <button class="mobile" name="device" value="mobile">📱 Mobile</button>
+            <button class="desktop" name="device" value="desktop">💻 Desktop</button>
+        </form>
+    </div>
+</body>
+</html>

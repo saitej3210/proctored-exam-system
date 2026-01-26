@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Student Login</title>
+
+    <!-- 🔑 VERY IMPORTANT FOR MOBILE -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <style>
+        body {
+            margin: 0;
+            min-height: 100vh;
+            background: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-family: Arial, sans-serif;
+            color: white;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+
+        .login-card {
+            background: rgba(255,255,255,0.12);
+            padding: 24px;
+            border-radius: 14px;
+            width: 100%;
+            max-width: 360px;   /* 🔥 mobile friendly */
+            text-align: center;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.4);
+        }
+
+        h2 {
+            margin-bottom: 20px;
+        }
+
+        input {
+            width: 100%;
+            padding: 14px;
+            margin: 10px 0;
+            border-radius: 8px;
+            border: none;
+            outline: none;
+            font-size: 16px;   /* 🔥 mobile tap friendly */
+        }
+
+        button {
+            width: 100%;
+            padding: 14px;
+            margin-top: 12px;
+            background: #22c55e;
+            border: none;
+            border-radius: 8px;
+            font-size: 17px;
+            cursor: pointer;
+            color: #022c22;
+            font-weight: bold;
+        }
+
+        button:hover {
+            background: #16a34a;
+        }
+
+        .error {
+            color: #ef4444;
+            margin-top: 10px;
+            font-size: 14px;
+        }
+    </style>
+</head>
+
+<body>
+
+<div class="login-card">
+    <h2>📱 Student Login</h2>
+
+    <form method="POST" action="/student/login">
+
+        <input
+            type="text"
+            name="roll"
+            placeholder="Roll No"
+            required
+        >
+
+        <input
+            type="text"
+            name="name"
+            placeholder="Name"
+            required
+        >
+
+        <input
+            type="number"
+            name="exam_id"
+            placeholder="Exam ID"
+            required
+        >
+
+        {% if error %}
+            <div class="error">
+                {{ error }}
+            </div>
+        {% endif %}
+
+        <button type="submit">Login</button>
+
+    </form>
+</div>
+
+</body>
+</html>

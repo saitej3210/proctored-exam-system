@@ -2,16 +2,12 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Proctored Exam Portal</title>
+    <title>ProctoredK</title>
 
-    <!-- IMPORTANT FOR MOBILE -->
+    <!-- 🔑 IMPORTANT -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
     <style>
-        * {
-            box-sizing: border-box;
-        }
-
         body {
             margin: 0;
             height: 100vh;
@@ -21,15 +17,17 @@
             align-items: center;
             font-family: Arial, sans-serif;
             color: white;
+            padding: 20px;
+            box-sizing: border-box;
         }
 
         .box {
-            background: rgba(255, 255, 255, 0.1);
-            padding: 40px;
-            border-radius: 12px;
+            background: rgba(255,255,255,0.12);
+            padding: 28px;
+            border-radius: 16px;
             text-align: center;
-            width: 360px;
-            max-width: 90%;
+            width: 100%;
+            max-width: 360px;
             box-shadow: 0 10px 30px rgba(0,0,0,0.4);
         }
 
@@ -39,54 +37,44 @@
 
         a {
             display: block;
-            margin-top: 18px;
+            margin-top: 15px;
             padding: 14px;
             background: #2c2c2c;
             color: white;
             text-decoration: none;
-            border-radius: 8px;
-            font-size: 16px;
-            transition: background 0.2s ease;
+            border-radius: 10px;
+            font-size: 17px;
         }
 
-        a:hover {
-            background: #444;
-        }
-
-        .admin {
+        a.admin {
             background: #22c55e;
             color: #022c22;
             font-weight: bold;
         }
 
-        .admin:hover {
-            background: #16a34a;
+        a.student {
+            background: #38bdf8;
+            color: #022c22;
+            font-weight: bold;
         }
 
-        /* 🔥 MOBILE TWEAKS */
-        @media (max-width: 480px) {
-            .box {
-                padding: 28px;
-            }
-
-            h2 {
-                font-size: 20px;
-            }
-
-            a {
-                font-size: 15px;
-                padding: 12px;
-            }
+        a:hover {
+            opacity: 0.9;
         }
     </style>
 </head>
 
 <body>
     <div class="box">
-        <h2>Proctored Exam Portal</h2>
+        <h2>📱 ProctoredK</h2>
 
-        <a href="/admin-login" class="admin">Admin Login</a>
-        <a href="/student/login">Student Login</a>
+        <a class="admin" href="/admin-login">
+            Admin Login
+        </a>
+
+        <a class="student" href="/student/login">
+            Student Login
+        </a>
     </div>
 </body>
 </html>

@@ -1,9 +1,10 @@
+print("🔥🔥 THIS FILE IS RUNNING 🔥🔥", __file__)
 import re
 import time
 import os
 import sqlite3
 import pdfplumber
-from db import get_db, init_db, migrate_questions_table
+from db import get_db, init_db
 from flask import (
     Flask,
     request,
@@ -12,15 +13,33 @@ from flask import (
     session,
     send_from_directory
 )
+
+from pathlib import Path
+from flask import send_file, Response
+import mimetypes
 from db import (
     init_db,
-    migrate_students_table,
-    migrate_results_table,
-    migrate_exam_sessions_table,
-    migrate_exams_table,
-    migrate_questions_table,
     get_db
 )
+from flask import abort
+from flask import send_file
+
+init_db()
+from exam_pause import pause_exam
+from db_init import init_db
+from db import migrate_exam_violations_table
+migrate_exam_violations_table()
+
+init_db()
+
+def get_db():
+    conn = sqlite3.connect(
+        DB_PATH,
+        timeout=30,
+        check_same_thread=False
+    )
+    conn.row_factory = sqlite3.Row
+    return conn
 # --------------------------------
 # ONLY for init & migration
 # --------------------------------
@@ -36,18 +55,18 @@ from db import get_db
 # --------------------------------
 # APP INIT
 # --------------------------------
+
 app = Flask(__name__, template_folder="templates")
-app.secret_key = os.environ.get("SECRET_KEY", "fallback-secret")
+app.secret_key = os.environ.get("SECRET_KEY", "local-dev-key")
 
 # 🔥 RUN ONCE AT START
 with app.app_context():
-    init_db()
-    migrate_questions_table()
-    migrate_students_table()
-    migrate_exam_sessions_table()
-    migrate_results_table()
-    migrate_exams_table()
-
+    init_db(),get_db()
+   # migrate_questions_table()
+   # migrate_students_table()
+    # migrate_exam_sessions_timer_pause()   # 👈 THIS LINE IS MISSING NOW
+    # migrate_results_table()
+    # migrate_exams_table()
 # --------------------------------
 # Uploads
 # --------------------------------
@@ -70,9 +89,6 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 
 
-@app.route("/")
-def splash():
-    return render_template("splash.html")
 
 @app.route("/login")
 def index():
@@ -81,22 +97,11 @@ def index():
 # -------------------------------------------------
 # ADMIN LOGIN
 # -------------------------------------------------
-@app.route("/admin/login", methods=["GET", "POST"])
-def admin_login():
-    if request.method == "POST":
-        if request.form["username"] == "admin" and request.form["password"] == "admin":
-            session["admin"] = True
-            return redirect("/admin-dashboard")
-    return render_template("admin_login.html")
 
 # -------------------------------------------------
 # ADMIN DASHBOARD
 # -------------------------------------------------
-@app.route("/admin-dashboard")
-def admin_dashboard():
-    if not session.get("admin"):
-        return redirect("/admin/login")
-    return render_template("admin_dashboard.html")
+
 
 # -------------------------------------------------
 # CREATE EXAM
@@ -341,120 +346,118 @@ def student_join_exam(exam_id):
     conn.close()
 
     return redirect(url_for("student_exam", exam_id=exam_id))
+@app.route("/student/login", methods=["GET"])
+def student_login_page():
+    return render_template("student/student_login.html")
+
 
 @app.route("/student/login", methods=["GET", "POST"])
 def student_login():
-    if request.method == "POST":
-        roll = request.form.get("roll", "").strip()
-        name = request.form.get("name", "").strip()
-        exam_id_raw = request.form.get("exam_id", "").strip()
 
-        # -----------------------------
-        # 1️⃣ BASIC VALIDATION
-        # -----------------------------
-        if not roll or not name or not exam_id_raw.isdigit():
-            return render_template(
-                "student/student_login.html",
-                error="❌ Please enter valid details"
-            )
+    # --------------------
+    # GET : show login page
+    # --------------------
+    if request.method == "GET":
+        return render_template("student/login.html")
 
-        exam_id = int(exam_id_raw)
+    # --------------------
+    # POST : login student
+    # --------------------
+    roll = request.form["roll"]
+    name = request.form["name"]
+    exam_id = int(request.form["exam_id"])
 
-        conn = get_db()
-        cur = conn.cursor()
+    conn = get_db()
+    conn.row_factory = sqlite3.Row
+    cur = conn.cursor()
 
-        # -----------------------------
-        # 2️⃣ CHECK EXAM EXISTS
-        # -----------------------------
-        cur.execute("SELECT started FROM exams WHERE id = ?", (exam_id,))
-        exam = cur.fetchone()
+    # --------------------
+    # check student exists
+    # --------------------
+    cur.execute("""
+        SELECT * FROM students
+        WHERE roll = ? AND exam_id = ?
+    """, (roll, exam_id))
 
-        if not exam:
-            conn.close()
-            return render_template(
-                "student/student_login.html",
-                error="❌ Invalid Exam ID"
-            )
+    student = cur.fetchone()
 
-        started = exam["started"]  # 0 or 1
-
-        # -----------------------------
-        # 3️⃣ CHECK EXISTING STUDENT
-        # -----------------------------
+    # --------------------
+    # FIRST TIME STUDENT
+    # --------------------
+    if not student:
         cur.execute("""
-            SELECT status
-            FROM students
-            WHERE roll = ? AND exam_id = ? AND removed = 0
-        """, (roll, exam_id))
-        existing = cur.fetchone()
-
-        # -----------------------------
-        # 4️⃣ DECIDE STATUS (IMPORTANT)
-        # -----------------------------
-        # 👉 ALWAYS require admin approval
-        # - before exam
-        # - during exam
-        status = "pending"
-
-        if existing:
-            cur.execute("""
-                UPDATE students
-                SET status = ?, removed = 0
-                WHERE roll = ? AND exam_id = ?
-            """, (status, roll, exam_id))
-        else:
-            cur.execute("""
-                INSERT INTO students (exam_id, roll, name, status, removed)
-                VALUES (?, ?, ?, ?, 0)
-            """, (exam_id, roll, name, status))
+            INSERT INTO students (
+                roll, name, exam_id, status, is_online, left
+            )
+            VALUES (?, ?, ?, 'waiting', 1, 0)
+        """, (roll, name, exam_id))
 
         conn.commit()
-        conn.close()
+        student_id = cur.lastrowid
 
-        # -----------------------------
-        # 5️⃣ SESSION (ONE FORMAT ONLY)
-        # -----------------------------
-        session["student"] = {
-            "roll": roll,
-            "name": name
-        }
-        session["exam_id"] = exam_id
+    # --------------------
+    # EXISTING STUDENT
+    # --------------------
+    else:
+        student_id = student["id"]
 
-        # -----------------------------
-        # 6️⃣ ALWAYS GO TO WAITING ROOM
-        # -----------------------------
-        return redirect("/student/waiting")
+        cur.execute("""
+            UPDATE students
+            SET
+                is_online = 1,
+                left = 0
+            WHERE id = ?
+        """, (student_id,))
 
-    # -----------------------------
-    # GET REQUEST
-    # -----------------------------
-    return render_template("student/student_login.html")
+        conn.commit()
 
+    conn.close()
+
+    # --------------------
+    # ✅ SESSION SET (THIS IS CORRECT)
+    # --------------------
+    session["student"] = {
+        "roll": roll,
+        "name": name
+    }
+    session["student_id"] = student_id   # 🔥 VERY IMPORTANT
+    session["exam_id"] = exam_id          # 🔥 VERY IMPORTANT
+
+    # --------------------
+    # GO TO WAITING PAGE
+    # --------------------
+    return redirect(f"/student/waiting/{exam_id}")
 # -------------------------------------------------
 # START EXAM
 # -------------------------------------------------
-@app.route("/admin/exam/<int:exam_id>/start", methods=["POST"])
-def start_exam(exam_id):
-    if not session.get("admin"):
-        return redirect("/admin/login")
 
+# -------------------------------------------------
+# STUDENT LOGIN
+# -------------------------------------------------
+@app.route("/admin/exam/<int:exam_id>/start")
+def start_exam(exam_id):
+    import time
+    now = int(time.time())
+
+    # ✅ ADD THESE (MISSING PART)
     conn = get_db()
     cur = conn.cursor()
 
     cur.execute("""
-        UPDATE exams
-        SET started = 1
-        WHERE id = ?
-    """, (exam_id,))
+    UPDATE exam_sessions
+    SET status='RUNNING',
+     timer_enabled = 1,                -- 🔥 THIS WAS MISSING
+     timer_started_at = COALESCE(timer_started_at, ?),
+     paused_at = NULL,
+     total_paused_seconds = 0
+    WHERE exam_id = ?
+    """, (now, exam_id))
 
     conn.commit()
     conn.close()
 
     return redirect(f"/admin/exam/{exam_id}/control")
 
-# -------------------------------------------------
-# STUDENT LOGIN
-# -------------------------------------------------
 
 
 # --------------------------------------------------
@@ -472,13 +475,42 @@ def student_start_exam(exam_id):
 
     return redirect(f"/student/exam/{exam_id}")
 
+@app.route("/student/init-exam-session", methods=["POST"])
+def init_exam_session():
+    if "student_id" not in session or "exam_id" not in session:
+        return jsonify({"ok": 0})
+
+    student_id = session["student_id"]
+    exam_id = session["exam_id"]
+
+    import time
+    now = int(time.time())
+
+    conn = get_db()
+    cur = conn.cursor()
+
+    # 🔒 create session row ONLY if not exists
+    cur.execute("""
+        INSERT INTO exam_sessions (student_id, exam_id, status, start_time)
+        SELECT ?, ?, 'RUNNING', ?
+        WHERE NOT EXISTS (
+            SELECT 1 FROM exam_sessions
+            WHERE student_id=? AND exam_id=?
+        )
+    """, (student_id, exam_id, now, student_id, exam_id))
+
+    conn.commit()
+    conn.close()
+
+    return jsonify({"ok": 1})
+
+
+
 # -------------------------------------------------
 # STUDENT WAITING
 # -------------------------------------------------
-from flask import render_template, session, redirect
 
 
-  # ------------------------------------------
 # STUDENT WAITING ROOM (SAFE VERSION)
 # ------------------------------------------
 
@@ -487,49 +519,12 @@ def student_submitted():
     return render_template("student/student_submitted.html")
 
 
-
-@app.route("/student/waiting")
-def student_waiting():
-
-    if "student" not in session or "exam_id" not in session:
-        return redirect("/student/login")
-
-    student = session["student"]
-    exam_id = session["exam_id"]
-
-    conn = get_db()
-    conn.row_factory = sqlite3.Row
-    cur = conn.cursor()
-
-    cur.execute("""
-        SELECT status
-        FROM students
-        WHERE roll = ? AND exam_id = ?
-    """, (student["roll"], exam_id))
-    row = cur.fetchone()
-
-    cur.execute("""
-        SELECT started
-        FROM exams
-        WHERE id = ?
-    """, (exam_id,))
-    exam = cur.fetchone()
-
-    conn.close()
-
-    status = row["status"] if row else "pending"
-    started = exam["started"] if exam else 0
-
-    # ✅ ONLY THIS CONDITION
-    if status == "approved" and started == 1:
-        return redirect(f"/student/exam/{exam_id}")
-
-    return render_template(
-        "student/student_waiting.html",
-        student=student,
-        status=status
-    )
-
+@app.route("/student/waiting/<int:exam_id>")
+def student_waiting(exam_id):
+    # ❌ DO NOT check session here
+    # ❌ DO NOT redirect to login here
+    return render_template("student/student_waiting.html", exam_id=exam_id)
+from evaluator import evaluate_exam
 
 @app.route("/admin/exam/<int:exam_id>/release_results", methods=["POST"])
 def release_results(exam_id):
@@ -539,6 +534,19 @@ def release_results(exam_id):
     conn = get_db()
     cur = conn.cursor()
 
+    # get students of this exam
+    cur.execute("""
+        SELECT roll
+        FROM students
+        WHERE exam_id = ?
+    """, (exam_id,))
+    students = cur.fetchall()
+
+    # evaluate each student ONCE
+    for s in students:
+        evaluate_exam(s["roll"], exam_id)
+
+    # mark results released
     cur.execute("""
         UPDATE exams
         SET results_released = 1
@@ -550,30 +558,26 @@ def release_results(exam_id):
 
     return redirect(f"/admin/exam/{exam_id}/control")
 
-@app.route("/student/check-results_status")
+@app.route("/student/check-results-status")
 def check_results_status():
-
     if "exam_id" not in session:
-        return {"released": False}
+        return jsonify({"status":"LOGOUT"})
 
     exam_id = session["exam_id"]
 
     conn = get_db()
     cur = conn.cursor()
-
-    cur.execute("""
-        SELECT results_released
-        FROM exams
-        WHERE id = ?
-    """, (exam_id,))
-    row = cur.fetchone()
-
+    cur.execute(
+        "SELECT results_released FROM exams WHERE id = ?",
+        (exam_id,)
+    )
+    exam = cur.fetchone()
     conn.close()
 
-    return {
-        "released": bool(row and row["results_released"] == 1)
-    } 
+    if exam and exam["results_released"] == 1:
+        return jsonify({"status":"RELEASED"})
 
+    return jsonify({"status":"WAIT"})
 
 # -------------------------------------------------
 # STUDENT EXAM (DB QUESTIONS)
@@ -603,28 +607,24 @@ def allow_rejoin(exam_id, roll):
 
     return redirect(f"/admin/exam/{exam_id}/control")
 
-
 @app.route("/student/leave", methods=["POST"])
 def student_leave():
-    if "student" not in session:
-        return redirect("/student/login")
+    student_id = session.get("student_id")
+    exam_id = session.get("exam_id")
 
-    roll = session["student"]["roll"]
-    exam_id = session["exam_id"]
-
-    conn = get_db()
-    cur = conn.cursor()
-    cur.execute("""
-        UPDATE students
-        SET status = 'left'
-        WHERE roll = ? AND exam_id = ?
-    """, (roll, exam_id))
-    conn.commit()
-    conn.close()
+    if student_id and exam_id:
+        conn = get_db()
+        cur = conn.cursor()
+        cur.execute("""
+            UPDATE students
+            SET left = 1, status = 'waiting'
+            WHERE id = ?
+        """, (student_id,))
+        conn.commit()
+        conn.close()
 
     session.clear()
-    return redirect("/")    
-
+    return jsonify({"ok": True})
 @app.route("/student/leave_exam/<int:exam_id>", methods=["POST"])
 def student_leave_exam(exam_id):
     if "student" not in session:
@@ -685,85 +685,86 @@ def student_left():
     return "", 204
 
 
+
 @app.route("/student/status")
 def student_status():
-    if "student" not in session:
-        return {"status": "logout"}
+    exam_id = session.get("exam_id")
+    student = session.get("student")
 
-    roll = session["student"]["roll"]
-    exam_id = session["exam_id"]
+    if not exam_id or not student:
+        return {"status": "WAIT"}  # ❗ NEVER LOGOUT
 
     conn = get_db()
     cur = conn.cursor()
 
+    cur.execute("SELECT started FROM exams WHERE id = ?", (exam_id,))
+    exam = cur.fetchone()
+
     cur.execute("""
-        SELECT status FROM students
-        WHERE roll = ? AND exam_id = ?
-    """, (roll, exam_id))
+        SELECT status
+        FROM students
+        WHERE roll = ? AND exam_id = ? AND removed = 0
+    """, (student["roll"], exam_id))
     row = cur.fetchone()
 
     conn.close()
 
     if not row:
-        return {"status": "removed"}
+        return {"status": "WAIT"}
 
-    return {"status": row["status"]}
+    if row["status"] == "paused":
+        return {"status": "paused"}
 
-# -------------------------------------------------
+    if row["status"] == "approved" and exam and exam["started"] == 1:
+        return {"status": "START"}
+
+    return {"status": "WAIT"}
 # STUDENT SUBMIT
 # -------------------------------------------------
-
+from evaluator import evaluate_exam
 
 @app.route("/student/submit_exam", methods=["POST"])
 def submit_exam():
-    exam_id = int(request.form.get("exam_id"))
-    student = session.get("student")
-    roll = student["roll"]
+
+    student_id = session.get("student_id")
+    exam_id = session.get("exam_id")
+
+    if not student_id or not exam_id:
+        print("❌ SESSION LOST AT SUBMIT")
+        return redirect("/student/login")
 
     conn = get_db()
     cur = conn.cursor()
 
+    # 🔥 Evaluate exam
+    from evaluator import evaluate_exam
+    evaluate_exam(student_id, exam_id)
+
+    # 🔥 Update exam status
     cur.execute("""
-        SELECT question_no
-        FROM questions
-        WHERE exam_id = ?
-    """, (exam_id,))
-    questions = cur.fetchall()
-
-    for q in questions:
-        q_no = q["question_no"]
-        selected = request.form.get(f"answer_{q_no}")
-
-        if selected:
-            cur.execute("""
-                INSERT INTO student_answers
-                (student_id, exam_id, question_no, selected_option)
-                VALUES (?, ?, ?, ?)
-            """, (roll, exam_id, q_no, selected))
+        UPDATE exam_sessions
+        SET status = 'SUBMITTED'
+        WHERE student_id = ? AND exam_id = ?
+    """, (student_id, exam_id))
 
     conn.commit()
     conn.close()
 
-    return redirect("/student/wait-for-results")
+    print("✅ EXAM SUBMITTED, SESSION OK")
 
-
-@app.route("/student/wait-for-results")
-def student_wait_for_results():
-    if "student" not in session:
-        return redirect("/student/login")
-
+    # 🚀 Golden flow
     return render_template("student/wait_for_results.html")
 
 
 @app.route("/student/wait-for-results")
 def wait_for_results():
-
-    if "student" not in session or "exam_id" not in session:
+    if "student" not in session:
         return redirect("/student/login")
 
-    return render_template("student/student_wait_for_results.html")   
+    return render_template("student/wait_for_results.html")    
 
-from evaluator import evaluate_exam
+
+
 
 
 @app.route("/student/done")
@@ -772,13 +773,17 @@ def student_done():
     if not session.get("student"):
         return redirect("/")
 
-    # ✅ get student_id properly
     conn = get_db()
     cur = conn.cursor()
+
     cur.execute("""
-        SELECT id FROM students
-        WHERE roll = ? AND exam_id = ?
-    """, (session["student"]["roll"], session["exam_id"]))
+        SELECT id, exam_id
+        FROM students
+        WHERE roll = ?
+        ORDER BY id DESC
+        LIMIT 1
+    """, (session["student"]["roll"],))
+
     row = cur.fetchone()
     conn.close()
 
@@ -786,30 +791,17 @@ def student_done():
         return "Student not found", 400
 
     student_id = row["id"]
-    exam_id = session["exam_id"]
+    exam_id = row["exam_id"]   # 🔥 CORRECT EXAM ID
 
-    # ✅ NOW evaluate
     result = evaluate_exam(student_id, exam_id)
 
-    return render_template("student/student_done.html", result=result)
+    return render_template(
+        "student/student_done.html",
+        result=result
+    )
 
 
-@app.route("/admin/student/<int:exam_id>/<roll>/approve", methods=["POST"])
-def approve_student(exam_id, roll):
-    if not session.get("admin"):
-        return redirect("/admin/login")
 
-    conn = get_db()
-    cur = conn.cursor()
-    cur.execute("""
-        UPDATE students
-        SET status = 'approved'
-        WHERE exam_id = ? AND roll = ?
-    """, (exam_id, roll))
-    conn.commit()
-    conn.close()
-
-    return redirect(f"/admin/exam/{exam_id}/control")
 
 # -------------------------------------------------
 # STUDENT RESULT
@@ -918,22 +910,8 @@ def admin_results(exam_id):
     )
 
 
-@app.route("/admin/exam/<int:exam_id>/resume/<int:student_id>", methods=["POST"])
-def admin_resume_student(exam_id, student_id):
 
-    conn = get_db()
-    cur = conn.cursor()
 
-    cur.execute("""
-        UPDATE students
-        SET status = 'approved'
-        WHERE id = ? AND exam_id = ?
-    """, (student_id, exam_id))
-
-    conn.commit()
-    conn.close()
-
-    return redirect(f"/admin/exam/{exam_id}/control")
 
 @app.route("/admin/exam/<int:exam_id>/results")
 def view_results(exam_id):
@@ -1007,24 +985,6 @@ def exam_status(exam_id):
 
     return jsonify({"status": "UNKNOWN"})
 
-@app.route("/exam/resume", methods=["POST"])
-def exam_resume():
-    student_id = request.json["student_id"]
-    exam_id = request.json["exam_id"]
-
-    conn = get_db()
-    cur = conn.cursor()
-
-    cur.execute("""
-        UPDATE exam_sessions
-        SET status='RUNNING'
-        WHERE student_id=? AND exam_id=?
-    """, (student_id, exam_id))
-
-    conn.commit()
-    conn.close()
-
-    return {"ok": True}
 
 
 @app.route("/student/violation", methods=["POST"])
@@ -1083,41 +1043,25 @@ from flask import jsonify
 
 from datetime import datetime
 
-@app.route("/exam/pause", methods=["POST"])
-def exam_pause():
-    data = request.get_json(force=True)
-    student_id = data.get("student_id")
-    exam_id = data.get("exam_id")
+@app.route("/student/exam-paused/<int:exam_id>")
+def student_exam_paused(exam_id):
+    if not session.get("student"):
+        return redirect("/student/login")
 
-    conn = get_db()
-    cur = conn.cursor()
-
-    cur.execute("""
-        SELECT status FROM exam_sessions
-        WHERE student_id=? AND exam_id=?
-    """, (student_id, exam_id))
-    row = cur.fetchone()
-
-    if not row or row[0] == "SUBMITTED":
-        conn.close()
-        return jsonify({"status": "IGNORED"})
-
-    cur.execute("""
-        UPDATE exam_sessions
-        SET status='PAUSED'
-        WHERE student_id=? AND exam_id=?
-    """, (student_id, exam_id))
-
-    conn.commit()
-    conn.close()
-    return jsonify({"status": "PAUSED"})
+    return render_template(
+        "student/exam_paused.html",
+        exam_id=exam_id
+    )
 
 # -------------------------------------------------
 # ADMIN EXAM CONTROL
 # -------------------------------------------------    
-
 @app.route("/admin/exam/<int:exam_id>/control")
 def admin_exam_control(exam_id):
+
+    # --------------------
+    # Admin check
+    # --------------------
     if not session.get("admin"):
         return redirect("/admin/login")
 
@@ -1125,95 +1069,55 @@ def admin_exam_control(exam_id):
     conn.row_factory = sqlite3.Row
     cur = conn.cursor()
 
-    # -------------------------------------------------
-    # ✅ STEP 2 — AUTO PAUSE (TAB SWITCH / NO PING)
-    # -------------------------------------------------
-    cur.execute("""
-        SELECT id, last_ping, status
-        FROM exam_sessions
-        WHERE exam_id = ?
-    """, (exam_id,))
-
-    sessions = cur.fetchall()
-    now = int(time.time())
-
-    for s in sessions:
-        if s["status"] == "RUNNING" and s["last_ping"]:
-            try:
-                if now - int(s["last_ping"]) > 10:
-                    cur.execute("""
-                        UPDATE exam_sessions
-                        SET status = 'PAUSED'
-                        WHERE id = ?
-                    """, (s["id"],))
-            except:
-                pass
-
-    conn.commit()
-
-    # -------------------------------------------------
-    # ✅ EXISTING STUDENT FETCH (UNCHANGED)
-    # -------------------------------------------------
+    # --------------------
+    # Fetch students + status
+    # --------------------
     cur.execute("""
         SELECT
-            s.id as student_id,
+            s.id AS student_id,
             s.roll,
             s.name,
-            s.status AS student_status,
-            COALESCE(es.status, 'NOT_STARTED') AS exam_status
+            CASE
+                WHEN s.is_online = 0 THEN 'left'
+                ELSE s.status
+            END AS student_status,
+            COALESCE(es.status, 'NOT_STARTED') AS exam_status,
+            (
+                SELECT COUNT(*)
+                FROM exam_violations v
+                WHERE v.student_id = s.id
+                  AND v.exam_id = ?
+            ) AS violation_count
         FROM students s
         LEFT JOIN exam_sessions es
-            ON es.student_id = s.id AND es.exam_id = ?
+          ON es.student_id = s.id
+         AND es.exam_id = ?
         WHERE s.exam_id = ?
-    """, (exam_id, exam_id))
+    """, (exam_id, exam_id, exam_id))
 
     students = cur.fetchall()
+
+    # --------------------
+    # Fetch exam started flag
+    # --------------------
+    cur.execute(
+        "SELECT started FROM exams WHERE id = ?",
+        (exam_id,)
+    )
+    exam = cur.fetchone()
+    exam_started = exam["started"] if exam else 0
+
     conn.close()
 
+    # --------------------
+    # Render control panel
+    # --------------------
     return render_template(
         "exam_control.html",
+        exam_id=exam_id,
         students=students,
-        exam_id=exam_id
+        exam_started=exam_started   # ✅ IMPORTANT FIX
     )
-
-
-@app.route("/admin/exam/<int:exam_id>/resume/<roll>", methods=["POST"])
-def admin_resume_exam(exam_id, roll):
-
-    if not session.get("admin"):
-        return redirect("/admin/login")
-
-    conn = get_db()
-    cur = conn.cursor()
-
-    # get student id
-    cur.execute("""
-        SELECT id
-        FROM students
-        WHERE roll = ? AND exam_id = ?
-    """, (roll, exam_id))
-    row = cur.fetchone()
-
-    if not row:
-        conn.close()
-        return "Student not found", 404
-
-    student_id = row[0]
-
-    # ✅ VERY IMPORTANT
-    cur.execute("""
-        UPDATE exam_sessions
-        SET status = 'RUNNING'
-        WHERE student_id = ? AND exam_id = ?
-    """, (student_id, exam_id))
-
-    conn.commit()
-    conn.close()
-
-    print("✅ ADMIN RESUMED EXAM:", student_id, exam_id)
-
-    return redirect(f"/admin/exam/{exam_id}/control")
-
 @app.route("/admin/remove-student/<int:exam_id>/<roll>", methods=["POST"])
 def admin_remove_student(exam_id, roll):
     if not session.get("admin"):
@@ -1287,184 +1191,190 @@ def remove_student(exam_id, roll):
 
     return redirect(f"/admin/exam/{exam_id}/control")
 
-
-
-
-from datetime import datetime
-
-
-
-
-@app.route('/student/exam/<int:exam_id>', methods=['GET', 'POST'])
+@app.route("/student/exam/<int:exam_id>", methods=["GET", "POST"])
 def student_exam(exam_id):
-
-    student = session.get("student")
-    if not student:
+    session["exam_id"] = exam_id
+    student_id = session.get("student_id")
+    if not student_id:
         return redirect("/student/login")
-
-    roll = student["roll"]
+    
+    session["exam_id"] = exam_id
 
     conn = get_db()
     conn.row_factory = sqlite3.Row
     cur = conn.cursor()
 
-    # ---------------- STUDENT ----------------
+    # ==================================================
+    # 🆕 SAFE ADD — CREATE exam_sessions ROW ONCE
+    # (DOES NOT RESET start_time on refresh / resume)
+    # ==================================================
+    import time
     cur.execute("""
-        SELECT id, status, removed
-        FROM students
-        WHERE roll = ? AND exam_id = ?
-    """, (roll, exam_id))
-    student_row = cur.fetchone()
+        INSERT INTO exam_sessions (student_id, exam_id, start_time, status)
+        SELECT ?, ?, ?, 'RUNNING'
+        WHERE NOT EXISTS (
+            SELECT 1 FROM exam_sessions
+            WHERE student_id = ? AND exam_id = ?
+        )
+    """, (
+        student_id,
+        exam_id,
+        int(time.time()),
+        student_id,
+        exam_id
+    ))
+    
+    # ==================================================
+    # 🆕 END SAFE ADD
+    # ==================================================
 
-    if not student_row:
-        conn.close()
-        return redirect("/student/login")
-
-    student_id = student_row["id"]
-
-    if student_row["removed"] == 1:
-        conn.close()
-        return redirect("/student/login")
-
-    if student_row["status"] == "submitted":
-        conn.close()
-        return redirect("/student/result")
-
-    if student_row["status"] != "approved":
-        conn.close()
-        return render_template("student/exam_paused.html", exam_id=exam_id)
-
-    # ======================================================
-    # ✅ FIX-2: SESSION STATUS CHECK (BEFORE EXAM PAGE LOAD)
-    # ======================================================
+    # ==================================================
+    # PHASE 2 RULE: exam must be RUNNING
+    # ==================================================
     cur.execute("""
         SELECT status
         FROM exam_sessions
-        WHERE student_id=? AND exam_id=?
+        WHERE student_id = ? AND exam_id = ?
     """, (student_id, exam_id))
-    session_check = cur.fetchone()
-
-    if session_check:
-        if session_check["status"] == "PAUSED":
-            conn.close()
-            return render_template("student/exam_paused.html", exam_id=exam_id)
-
-        if session_check["status"] == "REMOVED":
-            conn.close()
-            return redirect("/student/login")
-
-        if session_check["status"] == "SUBMITTED":
-            conn.close()
-            return redirect("/student/result")
-    # ======================================================
-
-    # ---------------- EXAM INFO ----------------
-    cur.execute("""
-        SELECT started, enable_timer, timer_minutes
-        FROM exams
-        WHERE id = ?
-    """, (exam_id,))
     exam_row = cur.fetchone()
 
-    if not exam_row or exam_row["started"] != 1:
+    if not exam_row or exam_row["status"] != "RUNNING":
         conn.close()
-        return redirect("/student/wait-for-results")
+        return redirect(f"/student/waiting/{exam_id}")
 
-    enable_timer = exam_row["enable_timer"] or 0
-    duration_minutes = exam_row["timer_minutes"] or 0
-
-    # ---------------- EXAM SESSION CREATE (ONLY ONCE) ----------------
-    if not session_check:
-        cur.execute("""
-            INSERT INTO exam_sessions (
-                student_id, exam_id, status,
-                timer_enabled, timer_minutes, timer_started_at
-            )
-            VALUES (?, ?, 'RUNNING', ?, ?, ?)
-        """, (
-            student_id,
-            exam_id,
-            enable_timer,
-            duration_minutes,
-            datetime.utcnow().isoformat() if enable_timer else None
-        ))
-        conn.commit()
-
-    # ---------------- SUBMIT ----------------
-    if request.method == "POST":
-        correct = 0
-
-        cur.execute("""
-            SELECT id, correct_option
-            FROM questions
-            WHERE exam_id=?
-        """, (exam_id,))
-        qs = cur.fetchall()
-
-        for q in qs:
-            ans = request.form.get(f"q_{q['id']}")
-            if ans and q["correct_option"] and ans.upper() == q["correct_option"].upper():
-                correct += 1
-
-        total = len(qs)
-
-        cur.execute("DELETE FROM results WHERE student_id=? AND exam_id=?", (student_id, exam_id))
-        cur.execute("""
-            INSERT INTO results (student_id, exam_id, correct, total)
-            VALUES (?, ?, ?, ?)
-        """, (student_id, exam_id, correct, total))
-
-        cur.execute("UPDATE students SET status='submitted' WHERE id=?", (student_id,))
-        cur.execute("""
-            UPDATE exam_sessions
-            SET status='SUBMITTED'
-            WHERE student_id=? AND exam_id=?
-        """, (student_id, exam_id))
-
-        conn.commit()
-        conn.close()
-        return redirect("/student/result")
-
-    # ---------------- QUESTIONS ----------------
+    # ==================================================
+    # LOAD QUESTIONS
+    # ==================================================
     cur.execute("""
-        SELECT id, question, option_a, option_b, option_c, option_d
+        SELECT
+            question_no,
+            question,
+            option_a,
+            option_b,
+            option_c,
+            option_d
         FROM questions
-        WHERE exam_id=?
-        ORDER BY question_no
+        WHERE exam_id = ?
+        ORDER BY question_no ASC
     """, (exam_id,))
-    questions = cur.fetchall()
+    question_rows = cur.fetchall()
 
+    # ✅ ⭐ IMPORTANT FIX ⭐
+    # sqlite Row → normal dict (JSON safe)
+    questions = [
+        {
+            "question_no": q["question_no"],
+            "question": q["question"],
+            "option_a": q["option_a"],
+            "option_b": q["option_b"],
+            "option_c": q["option_c"],
+            "option_d": q["option_d"],
+        }
+        for q in question_rows
+    ]
+
+    # ==================================================
+    # LOAD SAVED ANSWERS
+    # ==================================================
+    cur.execute("""
+        SELECT question_no, selected_option
+        FROM student_answers
+        WHERE student_id = ? AND exam_id = ?
+    """, (student_id, exam_id))
+    saved_rows = cur.fetchall()
+
+    saved_answers = {
+        row["question_no"]: row["selected_option"]
+        for row in saved_rows
+    }
+    # 🔒 SAFE: Create exam session ONLY if not exists
+    cur.execute("""
+     SELECT id FROM exam_sessions
+     WHERE exam_id = ? AND student_id = ?
+    """, (exam_id, student_id))
+
+    exists = cur.fetchone()
+
+    if not exists:
+     cur.execute("""
+        INSERT INTO exam_sessions (
+            exam_id,
+            student_id,
+            status,
+            timer_enabled,
+            exam_duration,
+            timer_started_at
+        )
+        SELECT
+            ?,
+            ?,
+            'RUNNING',
+            1,
+            duration * 60,
+            strftime('%s','now')
+        FROM exams
+        WHERE id = ?
+    """, (exam_id, student_id, exam_id))
+
+    conn.commit()
     conn.close()
 
     return render_template(
         "student/student_exam.html",
-        questions=questions,
         exam_id=exam_id,
         student_id=student_id,
-        enable_timer=enable_timer,
-        duration_minutes=duration_minutes
+        questions=questions,
+        saved_answers=saved_answers
     )
 
+from datetime import datetime
+from device_guard import check_device_lock   # 🔴 ADD 1
 
-@app.route("/admin/exam/<int:exam_id>/resume/<int:student_id>", methods=["POST"])
-def admin_exam_resume(exam_id, student_id):
-    if not session.get("admin"):
-        return redirect("/admin/login")
 
+from datetime import datetime
+import sqlite3
+from flask import session, redirect, render_template, request
+
+from flask import jsonify
+
+@app.route("/admin/exam/<int:exam_id>/resume/<int:student_id>")
+def resume_exam(exam_id, student_id):
     conn = get_db()
     cur = conn.cursor()
 
+    import time
+
+    # 🔥 STEP-3A: calculate paused time
+    row = cur.execute("""
+        SELECT paused_at, paused_seconds
+        FROM exam_sessions
+        WHERE exam_id = ? AND student_id = ?
+    """, (exam_id, student_id)).fetchone()
+
+    if row and row["paused_at"]:
+        paused_duration = int(time.time()) - int(row["paused_at"])
+
+        cur.execute("""
+            UPDATE exam_sessions
+            SET paused_seconds = paused_seconds + ?
+            WHERE exam_id = ? AND student_id = ?
+        """, (paused_duration, exam_id, student_id))
+
+    # ✅ EXISTING CODE (unchanged)
     cur.execute("""
         UPDATE exam_sessions
-        SET status = 'RUNNING',
-            resumed_at = strftime('%s','now')
-        WHERE exam_id = ? AND student_id = ?
+        SET status='RUNNING',
+            paused=0,
+            resume_allowed=1,
+            paused_at=NULL
+        WHERE exam_id=? AND student_id=?
     """, (exam_id, student_id))
 
     conn.commit()
     conn.close()
 
-    return redirect(f"/admin/exam/{exam_id}/control")
+    return jsonify({"resumed": 1})
+
 
 
 @app.route("/exam/progress", methods=["POST"])
@@ -1490,77 +1400,1557 @@ def exam_progress():
 
 from datetime import datetime
 
-@app.route("/exam/timer/<int:exam_id>")
-def exam_timer(exam_id):
 
-    student = session.get("student")
-    if not student:
-        return {"enabled": False}
 
-    roll = student["roll"]
+@app.route("/device", methods=["GET", "POST"])
+def device_select():
+    if request.method == "POST":
+        session["device"] = request.form.get("device")
+        return redirect("/student/login")
+    return render_template("device_select.html")
+
+
+@app.route("/home")
+def home():
+    if "mode" not in session:
+        return redirect("/")
+
+    return render_template("home.html")
+
+
+@app.route("/")
+def splash():
+    session.clear()   # 🔥 VERY IMPORTANT
+    return render_template("splash.html")
+
+
+
+@app.route("/mobile/student/login")
+def mobile_student_login():
+    return render_template("mobile/student/student_login.html")
+
+
+@app.route("/choose-device")
+def choose_device():
+    return render_template("choose_device.html")
+
+
+@app.route("/desktop")
+def desktop_home():
+    return render_template("home.html")  # already undi
+
+
+@app.route("/mobile")
+def mobile_home():
+    return render_template("mobile/student/home.html")
+
+
+@app.route("/admin-login")
+def admin_login_alias():
+    return redirect("/admin/login")
+
+
+@app.route("/admin-dashboard")
+def admin_dashboard():
+    if not session.get("admin"):
+        return redirect("/admin/login")
+
+    ui = session.get("ui")
+
+    if ui == "mobile":
+        return render_template("mobile/admin/admin_dashboard.html")
+    else:
+        return render_template("admin/admin_dashboard.html")
+
+@app.route("/")
+def mode_select():
+    return render_template("mode_select.html")
+
+
+@app.route("/set-ui/<mode>")
+def set_ui(mode):
+    if mode in ["desktop", "mobile"]:
+        session.clear()           # 🔥 important
+        session["ui"] = mode
+    return redirect("/admin/login")
+
+@app.route("/select/desktop")
+def select_desktop():
+    session["mode"] = "desktop"
+    return redirect("/home")
+
+@app.route("/select/mobile")
+def select_mobile():
+    session["mode"] = "mobile"
+    return redirect("/home")
+
+@app.route("/mobile/admin-dashboard")
+def admin_dashboard_mobile():
+    if not session.get("admin"):
+        return redirect("/admin/login")
+    return render_template("mobile/admin/admin_dashboard.html")
+
+
+@app.route("/admin/login", methods=["GET", "POST"])
+def admin_login():
+    if request.method == "POST":
+        if request.form["username"] == "admin" and request.form["password"] == "admin":
+            session["admin"] = True
+            return redirect("/admin-dashboard")
+    return render_template("admin_login.html")
+
+@app.route("/admin/exam/<int:exam_id>/analytics")
+def admin_exam_analytics(exam_id):
+    if not session.get("admin"):
+        return redirect("/admin/login")
+
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    cur = conn.cursor()
+
+    # ============================
+    # STEP 1: TOTAL STUDENTS
+    # ============================
+    cur.execute("""
+        SELECT COUNT(DISTINCT student_id) AS total_students
+        FROM student_answers
+        WHERE exam_id = ?
+    """, (exam_id,))
+    total_students = cur.fetchone()["total_students"] or 0
+
+    # ============================
+    # STEP 2: SCORES (AVG / HIGH / LOW)
+    # ============================
+    cur.execute("""
+    SELECT
+       sa.student_id,
+         SUM(
+           CASE
+              WHEN sa.selected_option = q.correct_option THEN 1
+              ELSE 0
+           END
+        ) AS score
+    FROM student_answers sa
+    JOIN questions q
+      ON q.exam_id = sa.exam_id
+     AND q.question_no = sa.question_no
+    WHERE sa.exam_id = ?
+    GROUP BY sa.student_id
+    """, (exam_id,))
+
+    rows = cur.fetchall()
+
+    scores = []
+    for row in rows:
+      score = row["score"] if row["score"] is not None else 0
+      scores.append(int(score))
+
+    if scores:
+      average = round(sum(scores) / len(scores), 2)
+      highest = max(scores)
+      lowest = min(scores)
+    else:
+      average = 0.0
+      highest = 0
+      lowest = 0
+
+    # ============================
+    # STEP 3: LEADERBOARD
+    # ============================
+    cur.execute("""
+        SELECT
+            s.roll,
+            s.name,
+            SUM(
+                CASE
+                    WHEN sa.selected_option = q.correct_option THEN 1
+                    ELSE 0
+                END
+            ) AS marks
+        FROM student_answers sa
+        JOIN students s ON s.id = sa.student_id
+        JOIN questions q
+            ON q.exam_id = sa.exam_id
+           AND q.question_no = sa.question_no
+        WHERE sa.exam_id = ?
+        GROUP BY sa.student_id
+        ORDER BY marks DESC
+    """, (exam_id,))
+    leaderboard = cur.fetchall()
+
+    # ============================
+    # STEP 4: HARDEST & EASIEST
+    # ============================
+    cur.execute("""
+        SELECT
+            q.question_no,
+            q.question,
+            SUM(
+                CASE
+                    WHEN sa.selected_option = q.correct_option THEN 1
+                    ELSE 0
+                END
+            ) AS correct_count
+        FROM questions q
+        LEFT JOIN student_answers sa
+            ON sa.question_no = q.question_no
+           AND sa.exam_id = q.exam_id
+        WHERE q.exam_id = ?
+        GROUP BY q.question_no
+        ORDER BY correct_count ASC
+        LIMIT 1
+    """, (exam_id,))
+    hardest = cur.fetchone()
+
+    cur.execute("""
+        SELECT
+            q.question_no,
+            q.question,
+            SUM(
+                CASE
+                    WHEN sa.selected_option = q.correct_option THEN 1
+                    ELSE 0
+                END
+            ) AS correct_count
+        FROM questions q
+        LEFT JOIN student_answers sa
+            ON sa.question_no = q.question_no
+           AND sa.exam_id = q.exam_id
+        WHERE q.exam_id = ?
+        GROUP BY q.question_no
+        ORDER BY correct_count DESC
+        LIMIT 1
+    """, (exam_id,))
+    easiest = cur.fetchone()
+
+    # ============================
+    # STEP 5: QUESTION-WISE ANALYTICS
+    # ============================
+     # ==============================
+# QUESTION-WISE ANALYSIS
+# ==============================
+   # ===============================
+    # QUESTION WISE ANALYTICS (FINAL)
+    # ===============================
+    cur.execute("""
+    SELECT
+      q.question_no,
+      q.question,
+      COUNT(sa.id) AS attempts,
+     SUM(CASE WHEN sa.selected_option = q.correct_option THEN 1 ELSE 0 END) AS correct,
+     SUM(CASE WHEN sa.selected_option != q.correct_option THEN 1 ELSE 0 END) AS wrong
+     FROM questions q
+     LEFT JOIN student_answers sa
+      ON sa.exam_id = q.exam_id
+     AND sa.question_no = q.question_no
+    WHERE q.exam_id = ?
+    GROUP BY q.question_no, q.question
+    ORDER BY q.question_no
+    """, (exam_id,))
+
+    rows = cur.fetchall()
+
+    question_integrity = []
+    question_chart_data = []
+
+    for r in rows:
+     attempts = r["attempts"] or 0
+     correct = r["correct"] or 0
+     wrong = r["wrong"] or 0
+     accuracy = round((correct / attempts) * 100, 2) if attempts > 0 else 0
+
+     question_integrity.append({
+        "question_no": r["question_no"],
+        "question": r["question"],
+        "attempts": attempts,
+        "correct": correct,
+        "wrong": wrong,
+        "accuracy": accuracy
+    })
+
+     question_chart_data.append({
+        "label": f"Q{r['question_no']}",
+        "correct": correct,
+        "wrong": wrong
+     })
+    
+# ============================
+# STEP 6: VIOLATION ANALYTICS (FINAL – COPY THIS FULL)
+# ============================
+# ============================
+# STEP 6: VIOLATION ANALYTICS (FINAL – FIXED)
+# ============================
+
+# ---------- TOTAL VIOLATIONS ----------
+    cur.execute("""
+     SELECT COUNT(*) AS total
+     FROM exam_violations
+     WHERE exam_id = ?
+    """, (exam_id,))
+    total_violations = cur.fetchone()["total"] or 0
+
+     # paused student (latest paused)
+    cur.execute("""
+     SELECT student_id
+     FROM exam_student_status
+     WHERE exam_id = ?
+      AND status = 'PAUSED'
+     ORDER BY updated_at DESC
+     LIMIT 1
+    """, (exam_id,))
+
+    row = cur.fetchone()
+    paused_student_id = row["student_id"] if row else None
+# ---------- TOP VIOLATOR ----------
+    cur.execute("""
+     SELECT s.roll, s.name, COUNT(v.id) AS violation_count
+     FROM exam_violations v
+     JOIN students s ON s.id = v.student_id
+     WHERE v.exam_id = ?
+     GROUP BY v.student_id
+     ORDER BY violation_count DESC
+     LIMIT 1
+    """, (exam_id,))
+    top_violator = cur.fetchone()
+
+    
+# ---------- EVENT-WISE COUNTS ----------
+    cur.execute("""
+     SELECT LOWER(event_type) AS event_type, COUNT(*) AS count
+     FROM exam_violations
+     WHERE exam_id = ?
+     GROUP BY LOWER(event_type)
+    """, (exam_id,))
+
+    rows = cur.fetchall()
+
+
+# ---------- TABLE DATA (LIST) ----------
+    violation_stats = []
+    for r in rows:
+      violation_stats.append({
+        "event_type": r["event_type"].upper(),
+        "count": r["count"]
+    })
+
+
+# ---------- CHART DATA (DICT) ----------
+    event_counts = {
+      "tab_switch": 0,
+      "blur": 0,
+      "copy": 0,
+      "paste": 0,
+      "multiple_faces": 0,
+      "mobile_detected": 0
+    }
+
+    for r in rows:
+     event_counts[r["event_type"]] = r["count"]
+
+    # TOTAL QUESTIONS IN EXAM
+    cur.execute("""
+      SELECT COUNT(*) AS total_qs
+      FROM questions
+      WHERE exam_id = ?
+    """, (exam_id,))
+    total_questions = cur.fetchone()["total_qs"]
+    # ============================
+    # STEP 7: STUDENT-WISE PERFORMANCE
+    # ============================
+    cur.execute("""
+        SELECT
+            sa.student_id,
+            s.roll,
+            s.name,
+            COUNT(DISTINCT sa.question_no) AS total,
+            SUM(
+                CASE
+                    WHEN sa.selected_option = q.correct_option THEN 1
+                    ELSE 0
+                END
+            ) AS score
+        FROM student_answers sa
+        JOIN students s ON s.id = sa.student_id
+        JOIN questions q
+            ON q.exam_id = sa.exam_id
+           AND q.question_no = sa.question_no
+        WHERE sa.exam_id = ?
+        GROUP BY sa.student_id
+    """, (exam_id,))
+
+    student_stats = [dict(r) for r in cur.fetchall()]
+
+    cur.execute("""
+        SELECT student_id, COUNT(*) AS violations
+        FROM exam_violations
+        WHERE exam_id = ?
+        GROUP BY student_id
+    """, (exam_id,))
+    violation_map = {r["student_id"]: r["violations"] for r in cur.fetchall()}
+
+    for s in student_stats:
+        s["violations"] = violation_map.get(s["student_id"], 0)
+        s["total"] = total_questions
+    # ============================
+    # STEP 8: AI CHEATING RISK (FINAL)
+    # ============================
+    cheating_risk = []
+    risk_summary = {"LOW": 0, "MEDIUM": 0, "HIGH": 0}
+
+    for s in student_stats:
+        v = s["violations"]
+        score = s["score"]
+
+        if v >= 5 or (v >= 3 and score >= 8):
+            risk = "HIGH"
+        elif v >= 2:
+            risk = "MEDIUM"
+        else:
+            risk = "LOW"
+
+        cheating_risk.append({
+            "roll": s["roll"],
+            "name": s["name"],
+            "risk": risk
+        })
+        risk_summary[risk] += 1
+
+    # ============================
+    # STEP 9: TIME-BASED ANALYTICS
+    # ============================
+    # =========================
+# TIME BASED QUESTION ANALYSIS
+# =========================
+    # ==============================
+# STEP X: TIME BASED QUESTION ANALYSIS
+# ==============================
+
+    cur.execute("""
+    SELECT
+        q.question_no,
+        ROUND(AVG(COALESCE(sa.time_taken, 0)), 2) AS avg_time_spent,
+        MIN(COALESCE(sa.time_taken, 0)) AS fastest,
+        MAX(COALESCE(sa.time_taken, 0)) AS slowest,
+        ROUND(AVG(COALESCE(sa.time_taken, 0)), 2) AS avg_duration
+    FROM questions q
+    LEFT JOIN student_answers sa
+        ON sa.question_no = q.question_no
+       AND sa.exam_id = ?
+    WHERE q.exam_id = ?
+    GROUP BY q.question_no
+    ORDER BY q.question_no
+    """, (exam_id, exam_id))
+
+    time_based_analysis = cur.fetchall()
+      
+    # ============================
+    # STEP 10: PROCTORING INTELLIGENCE
+    # ============================
+    proctoring_insights = []
+
+    for s in student_stats:
+        risk_score = (s["violations"] * 2)
+        if risk_score >= 10:
+            level = "HIGH"
+        elif risk_score >= 5:
+            level = "MEDIUM"
+        else:
+            level = "LOW"
+
+        proctoring_insights.append({
+         "student_id": s["student_id"],
+         "roll": s["roll"],
+         "name": s["name"],
+         "risk_score": risk_score,
+         "level": level
+        })
+
+    # ==============================
+# STEP 11: QUESTION INTEGRITY ANALYSIS
+# ==============================
+
+
+   
+    
+# =========================
+# CHEATING RISK DISTRIBUTION
+# =========================
+
+   # =========================
+# CHEATING RISK (DERIVED)
+# =========================
+
+    # =========================
+# CHEATING RISK DISTRIBUTION
+# =========================
+    # =============================
+# CHEATING RISK DISTRIBUTION
+# =============================
+    # ---------- CHEATING RISK DISTRIBUTION (SAFE DEFAULT) ----------
+    
+
+    # ================= CHEATING RISK DISTRIBUTION =================
+    cur.execute("""
+     SELECT event_type, COUNT(*) as cnt
+     FROM exam_violations
+     WHERE exam_id = ?
+     GROUP BY event_type
+     """, (exam_id,))
+
+    rows = cur.fetchall()
+
+    low = medium = high = 0
+
+    for r in rows:
+     event = r["event_type"].lower()   # <<< IDHI ADD CHEYYALI
+
+     if event in ("tab_switch", "blur"):
+        low += r["cnt"]
+     elif event in ("copy", "paste"):
+        medium += r["cnt"]
+     elif event in ("multiple_faces", "mobile_detected"):
+        high += r["cnt"]
+
+    cheating_risk = {
+     "low": low,
+     "medium": medium,
+     "high": high
+    }
+    # SAFE DEFAULT (MUST)
+    event_counts = {
+     "tab_switch": 0,
+      "blur": 0,
+      "copy": 0,
+      "paste": 0,
+      "multiple_faces": 0,
+      "mobile_detected": 0
+    }
+
+    cur.execute("""
+     SELECT event_type, COUNT(*) as cnt
+     FROM exam_violations
+     WHERE exam_id = ?
+     GROUP BY event_type
+    """, (exam_id,))
+
+    rows = cur.fetchall()
+
+    for r in rows:
+     key = r["event_type"].lower()
+     if key in event_counts:
+        event_counts[key] = r["cnt"]
+
+    cur.execute("""
+     SELECT roll
+     FROM students
+     WHERE id = ?
+    """, (paused_student_id,))
+    row = cur.fetchone()
+    paused_student_roll = row["roll"] if row else None 
+
+    cur.execute("""
+     SELECT
+        s.id AS student_id,
+        s.name,
+        s.roll,
+        es.status,
+        es.paused,
+        es.resume_allowed
+     FROM exam_sessions es
+     JOIN students s ON s.id = es.student_id
+     WHERE es.exam_id = ?
+      AND es.paused = 1
+     """, (exam_id,))
+    paused_students = cur.fetchall()
+    conn.close()
+
+    return render_template(
+        "admin_exam_analytics.html",
+        exam_id=exam_id,
+        total_students=total_students,
+        average=average,
+        highest=highest,
+        lowest=lowest,
+        leaderboard=leaderboard,
+        hardest=hardest,
+        easiest=easiest,
+        total_violations=total_violations,
+        top_violator=top_violator,
+        student_stats=student_stats,
+        risk_summary=risk_summary,
+        time_based_analysis=time_based_analysis,
+        proctoring_insights=proctoring_insights,
+        question_chart_data=question_chart_data,
+        cheating_risk=cheating_risk ,
+        question_integrity=question_integrity,
+        question_wise=question_integrity,
+        event_counts=event_counts,
+        violation_stats=violation_stats,
+        paused_student_id=paused_student_id,
+        paused_students=paused_students
+        
+        
+        
+    )
+
+@app.route("/admin/exam/<int:exam_id>/export/csv")
+def export_exam_csv(exam_id):
+    if not session.get("admin"):
+        return redirect("/admin/login")
 
     conn = get_db()
     conn.row_factory = sqlite3.Row
     cur = conn.cursor()
 
-    # ---------------- STUDENT ----------------
-    cur.execute("""
-        SELECT id
-        FROM students
-        WHERE roll=? AND exam_id=?
-    """, (roll, exam_id))
-    s = cur.fetchone()
-
-    if not s:
-        conn.close()
-        return {"enabled": False}
-
-    student_id = s["id"]
-
-    # ---------------- SESSION ----------------
     cur.execute("""
         SELECT
-            timer_started_at,
-            total_paused_seconds,
-            timer_enabled,
-            timer_minutes,
-            status
-        FROM exam_sessions
-        WHERE student_id=? AND exam_id=?
-    """, (student_id, exam_id))
-    sess = cur.fetchone()
+            s.roll,
+            s.name,
+            r.correct AS score,
+            r.total AS total_questions,
+            COUNT(v.id) AS violations
+        FROM results r
+        JOIN students s ON s.id = r.student_id
+        LEFT JOIN exam_violations v
+          ON v.student_id = s.id AND v.exam_id = ?
+        WHERE r.exam_id = ?
+        GROUP BY s.id
+    """, (exam_id, exam_id))
+
+    rows = cur.fetchall()
     conn.close()
 
-    if not sess:
-        return {"enabled": False}
+    import csv
+    from io import StringIO
+    from flask import Response
 
-    if sess["timer_enabled"] != 1:
-        return {"enabled": False}
+    output = StringIO()
+    writer = csv.writer(output)
 
-    if not sess["timer_started_at"]:
-        return {"enabled": False}
+    writer.writerow(["Roll", "Name", "Score", "Total", "Violations"])
+    for r in rows:
+        writer.writerow([
+            r["roll"],
+            r["name"],
+            r["score"],
+            r["total_questions"],
+            r["violations"]
+        ])
 
-    if sess["status"] == "SUBMITTED":
-        return {"enabled": False}
+    return Response(
+        output.getvalue(),
+        mimetype="text/csv",
+        headers={
+            "Content-Disposition":
+            f"attachment;filename=exam_{exam_id}_results.csv"
+        }
+    )
 
-    # ---------------- TIMER CALC ----------------
-    started_at = datetime.fromisoformat(sess["timer_started_at"])
-    paused_seconds = sess["total_paused_seconds"] or 0
-    total_seconds = sess["timer_minutes"] * 60
+@app.route("/admin/exam/<int:exam_id>/export/pdf")
+def export_exam_pdf(exam_id):
+    if not session.get("admin"):
+        return redirect("/admin/login")
 
-    elapsed = (datetime.utcnow() - started_at).total_seconds()
-    effective_elapsed = elapsed - paused_seconds
+    from reportlab.lib.pagesizes import A4
+    from reportlab.pdfgen import canvas
+    from io import BytesIO
+    from flask import send_file
 
-    remaining = max(0, int(total_seconds - effective_elapsed))
+    buffer = BytesIO()
+    pdf = canvas.Canvas(buffer, pagesize=A4)
+    width, height = A4
+
+    y = height - 50
+
+    pdf.setFont("Helvetica-Bold", 18)
+    pdf.drawString(50, y, f"Exam Analytics Report – Exam {exam_id}")
+    y -= 40
+
+    pdf.setFont("Helvetica", 12)
+
+    def line(text):
+        nonlocal y
+        pdf.drawString(50, y, text)
+        y -= 20
+
+    line(f"Total Students : {total_students}")
+    line(f"Average Score  : {average}")
+    line(f"Highest Score  : {highest}")
+    line(f"Lowest Score   : {lowest}")
+
+    pdf.showPage()
+    pdf.save()
+
+    buffer.seek(0)
+    return send_file(
+        buffer,
+        as_attachment=True,
+        download_name=f"exam_{exam_id}_analytics.pdf",
+        mimetype="application/pdf"
+    )
+
+@app.route("/admin/exam/<int:exam_id>/timeline")
+def admin_exam_timeline(exam_id):
+    if not session.get("admin"):
+        return redirect("/admin/login")
+
+    student_id = request.args.get("student_id")  # 👈 NEW (optional)
+
+    conn = get_db()
+    conn.row_factory = sqlite3.Row
+    cur = conn.cursor()
+
+    if student_id:
+        cur.execute("""
+            SELECT
+                s.roll,
+                s.name,
+                v.event_type,
+                v.created_at
+            FROM exam_violations v
+            JOIN students s ON s.id = v.student_id
+            WHERE v.exam_id = ?
+              AND v.student_id = ?
+            ORDER BY v.created_at DESC
+        """, (exam_id, student_id))
+    else:
+        cur.execute("""
+            SELECT
+                s.roll,
+                s.name,
+                v.event_type,
+                v.created_at
+            FROM exam_violations v
+            JOIN students s ON s.id = v.student_id
+            WHERE v.exam_id = ?
+            ORDER BY v.created_at DESC
+        """, (exam_id,))
+
+    timeline = cur.fetchall()
+
+    # 👇 dropdown data
+    cur.execute("""
+        SELECT id, roll, name
+        FROM students
+        WHERE exam_id = ?
+    """, (exam_id,))
+    students = cur.fetchall()
+   
+    conn.close()
+
+    return render_template(
+        "admin_exam_timeline.html",
+        exam_id=exam_id,
+        timeline=timeline,
+        students=students,
+        selected_student=student_id
+    ) 
+@app.route("/admin/exam/<int:exam_id>/export")
+def export_exam_results(exam_id):
+    if not session.get("admin"):
+        return redirect("/admin/login")
+
+    conn = get_db()
+    conn.row_factory = sqlite3.Row
+    cur = conn.cursor()
+
+    cur.execute("""
+        SELECT s.roll, s.name, r.correct, r.total_questions
+        FROM results r
+        JOIN students s ON s.id = r.student_id
+        WHERE r.exam_id = ?
+        ORDER BY r.correct DESC
+    """, (exam_id,))
+
+    rows = cur.fetchall()
+    conn.close()
+
+    import csv
+    from io import StringIO
+    from flask import Response
+
+    si = StringIO()
+    cw = csv.writer(si)
+    cw.writerow(["Roll", "Name", "Score", "Total"])
+
+    for r in rows:
+        cw.writerow([r["roll"], r["name"], r["correct"], r["total_questions"]])
+
+    return Response(
+        si.getvalue(),
+        mimetype="text/csv",
+        headers={
+            "Content-Disposition":
+            f"attachment;filename=exam_{exam_id}_results.csv"
+        }
+    )
+@app.route("/admin/exam/<int:exam_id>/analytics")
+def exam_analytics(exam_id):
+    if not session.get("admin"):
+        return redirect("/admin/login")
+
+    conn = get_db()
+    conn.row_factory = sqlite3.Row
+    cur = conn.cursor()
+
+    # total students who have results
+    cur.execute("""
+        SELECT COUNT(*) FROM results
+        WHERE exam_id = ?
+    """, (exam_id,))
+    total_students = cur.fetchone()[0]
+
+    # average score
+    # average score
+    cur.execute("""
+      SELECT AVG(correct) AS avg_score
+      FROM results
+      WHERE exam_id = ?
+    """, (exam_id,))
+
+    row = cur.fetchone()
+    avg_score = row["avg_score"] if row and row["avg_score"] is not None else 0
+    average = round(float(avg_score), 2)
+
+    # highest score
+    cur.execute("""
+      SELECT MAX(correct)
+      FROM results
+      WHERE exam_id = ?
+    """, (exam_id,))
+    highest = cur.fetchone()[0] or 0
+
+# lowest score
+    cur.execute("""
+      SELECT MIN(correct)
+      FROM results
+      WHERE exam_id = ?
+    """, (exam_id,))
+    lowest = cur.fetchone()[0] or 0
+    # ==============================
+# QUESTION-WISE ANALYTICS (STEP 8)
+# ==============================
+
+    
+    # 🔥 MARKS DISTRIBUTION (STEP-5 CORE)
+    cur.execute("""
+        SELECT
+            SUM(CASE WHEN correct BETWEEN 0 AND 2 THEN 1 ELSE 0 END) AS r0_2,
+            SUM(CASE WHEN correct BETWEEN 3 AND 5 THEN 1 ELSE 0 END) AS r3_5,
+            SUM(CASE WHEN correct BETWEEN 6 AND 8 THEN 1 ELSE 0 END) AS r6_8,
+            SUM(CASE WHEN correct BETWEEN 9 AND 10 THEN 1 ELSE 0 END) AS r9_10
+        FROM results
+        WHERE exam_id = ?
+    """, (exam_id,))
+
+    dist = cur.fetchone()
+    conn.close()
+
+    return render_template(
+        "admin_exam_analytics.html",
+        exam_id=exam_id,
+        total_students=total_students,
+        avg_score=avg_score,
+        highest=highest,
+        lowest=lowest,
+        dist=dist
+    )
+
+@app.route("/admin/exam/<int:exam_id>/question-analytics")
+def admin_question_analytics(exam_id):
+    if not session.get("admin"):
+        return redirect("/admin/login")
+
+    conn = get_db()
+    conn.row_factory = sqlite3.Row
+    cur = conn.cursor()
+
+    cur.execute("""
+        SELECT
+            sa.question_no,
+            q.question,
+            q.correct_option,
+            SUM(CASE WHEN sa.selected_option = 'a' THEN 1 ELSE 0 END) AS a_count,
+            SUM(CASE WHEN sa.selected_option = 'b' THEN 1 ELSE 0 END) AS b_count,
+            SUM(CASE WHEN sa.selected_option = 'c' THEN 1 ELSE 0 END) AS c_count,
+            SUM(CASE WHEN sa.selected_option = 'd' THEN 1 ELSE 0 END) AS d_count,
+            SUM(CASE WHEN sa.selected_option = q.correct_option THEN 1 ELSE 0 END) AS correct_count
+        FROM student_answers sa
+        JOIN questions q ON q.id = sa.question_no
+        WHERE sa.exam_id = ?
+        GROUP BY sa.question_no
+        ORDER BY sa.question_no
+    """, (exam_id,))
+
+    analytics = cur.fetchall()
+    conn.close()
+
+    return render_template(
+        "question_analytics.html",
+        exam_id=exam_id,
+        analytics=analytics
+    )    
+
+def calculate_cheating_risk(violations):
+    score = 0
+
+    for v in violations:
+        if v["event_type"] == "TAB_SWITCH":
+            score += 2
+        elif v["event_type"] == "FULLSCREEN_EXIT":
+            score += 3
+        elif v["event_type"] == "FACE_NOT_DETECTED":
+            score += 4
+        else:
+            score += 1
+
+    if score >= 7:
+        return "HIGH"
+    elif score >= 4:
+        return "MEDIUM"
+    else:
+        return "LOW"    
+
+
+from flask import jsonify
+import time
+
+# ---------- VIOLATION ----------
+from flask import request, jsonify
+import sqlite3
+
+@app.route("/exam/violation", methods=["POST"])
+def exam_violation():
+    # 🔁 BACKWARD COMPATIBILITY ROUTE
+    # Just call the real logic
+    return log_violation()
+    
+# ---------- TIMER ----------
+# =========================
+# EXAM TIMER API (STUDENT)
+# =========================
+
+@app.route("/admin/exam/<int:exam_id>/violations")
+def admin_exam_violations(exam_id):
+    if not session.get("admin"):
+        return jsonify([])
+
+    conn = get_db()
+    conn.row_factory = sqlite3.Row
+    cur = conn.cursor()
+
+    cur.execute("""
+        SELECT
+            s.roll,
+            s.name,
+            v.event_type,
+            COUNT(*) as cnt,
+            MAX(v.created_at) as last_time
+        FROM exam_violations v
+        JOIN students s ON s.id = v.student_id
+        WHERE v.exam_id=?
+        GROUP BY v.student_id, v.event_type
+        ORDER BY last_time DESC
+    """, (exam_id,))
+
+    rows = [dict(r) for r in cur.fetchall()]
+    conn.close()
+    return jsonify(rows)
+
+@app.route("/exam/pause", methods=["POST"])
+def exam_pause():
+
+    data = request.get_json(force=True)
+    student_id = data["student_id"]
+    exam_id = data["exam_id"]
+
+    conn = get_db()
+    cur = conn.cursor()
+
+    cur.execute("""
+        UPDATE exam_sessions
+        SET status='PAUSED'
+        WHERE student_id=? AND exam_id=?
+    """, (student_id, exam_id))
+
+    conn.commit()
+    conn.close()
+    return {"paused": True}
+
+@app.route("/exam/pause", methods=["POST"])
+def exam_pause_api():
+    data = request.get_json()
+    student_id = data.get("student_id")
+    exam_id = data.get("exam_id")
+
+    result = pause_exam(student_id, exam_id)
+    return jsonify(result)
+@app.route("/admin/exam/<int:exam_id>/start", methods=["POST"])
+def admin_start_exam(exam_id):
+    if not session.get("admin"):
+        return redirect("/admin/login")
+
+    conn = get_db()
+    conn.row_factory = sqlite3.Row
+    cur = conn.cursor()
+
+    # 1️⃣ Mark exam started
+    cur.execute("""
+        UPDATE exams
+        SET started = 1
+        WHERE id = ?
+    """, (exam_id,))
+
+    # 2️⃣ FORCE all APPROVED students → RUNNING
+    import time
+    now = int(time.time())
+
+    cur.execute("""
+    UPDATE exam_sessions
+    SET
+     status = 'RUNNING',
+     paused = 0,
+     paused_at = NULL,
+
+     timer_enabled = 1,
+
+     -- ✅ FIX: take duration from exams table
+     exam_duration = (
+     SELECT timer_minutes * 60
+     FROM exams
+     WHERE id = ?
+     ),
+
+     timer_started_at = COALESCE(timer_started_at, ?)
+    WHERE exam_id = ?
+    """, (exam_id, now, exam_id))
+
+    conn.commit()
+    conn.close()
+
+    return redirect(f"/admin/exam/{exam_id}/control")
+
+@app.route("/admin/student/<int:student_id>/approve", methods=["POST"])
+def admin_approve_student(student_id):
+    if not session.get("admin"):
+        return redirect("/admin/login")
+
+    conn = get_db()
+    conn.row_factory = sqlite3.Row
+    cur = conn.cursor()
+
+    # 1️⃣ Get exam_id of student
+    cur.execute("""
+        SELECT exam_id
+        FROM students
+        WHERE id = ?
+    """, (student_id,))
+    row = cur.fetchone()
+
+    if not row:
+        conn.close()
+        return redirect(request.referrer)
+
+    exam_id = row["exam_id"]
+
+    # 2️⃣ Mark student approved
+    cur.execute("""
+        UPDATE students
+        SET status = 'approved'
+        WHERE id = ?
+    """, (student_id,))
+
+    # 3️⃣ CREATE or UPDATE exam_session → APPROVED
+    cur.execute("""
+        SELECT id FROM exam_sessions
+        WHERE student_id = ? AND exam_id = ?
+    """, (student_id, exam_id))
+    existing = cur.fetchone()
+
+    if existing:
+        cur.execute("""
+            UPDATE exam_sessions
+            SET status = 'APPROVED'
+            WHERE student_id = ? AND exam_id = ?
+        """, (student_id, exam_id))
+    else:
+        cur.execute("""
+            INSERT INTO exam_sessions (student_id, exam_id, status)
+            VALUES (?, ?, 'APPROVED')
+        """, (student_id, exam_id))
+
+    conn.commit()
+    conn.close()
+
+    return redirect(request.referrer)
+
+@app.route("/student/waiting/status/<int:exam_id>")
+def student_waiting_status(exam_id):
+
+    student_id = session.get("student_id")
+    if not student_id:
+        return jsonify({"status": "NOT_LOGGED_IN"})
+
+    conn = get_db()
+    conn.row_factory = sqlite3.Row
+    cur = conn.cursor()
+
+    # 1️⃣ Exam started?
+    cur.execute("SELECT started FROM exams WHERE id = ?", (exam_id,))
+    exam = cur.fetchone()
+
+    # 2️⃣ Student exam session
+    cur.execute("""
+        SELECT status
+        FROM exam_sessions
+        WHERE exam_id = ? AND student_id = ?
+    """, (exam_id, student_id))
+    session_row = cur.fetchone()
+
+    conn.close()
+
+    # 🔥 FINAL CORRECT LOGIC
+
+    # Exam running → GO TO EXAM
+    if session_row and session_row["status"] == "RUNNING":
+        return jsonify({"status": "RUNNING"})
+
+    # Student approved → WAIT FOR START
+    if session_row and session_row["status"] == "APPROVED":
+        return jsonify({"status": "APPROVED"})
+
+    # Default
+    return jsonify({"status": "WAITING"})
+
+@app.route("/exam-paused")
+def exam_paused_page():
+    if not session.get("student_id"):
+        return redirect("/student/login")
+
+    return render_template("student/exam_paused.html")
+
+from datetime import datetime
+
+answered_at = datetime.now()
+time_taken = 0
+
+@app.route("/student/save-answer", methods=["POST"])
+def save_answer():
+    data = request.get_json()
+
+    # ✅ EXISTING (DO NOT CHANGE)
+    exam_id = session.get("exam_id")
+    student_id = session.get("student_id")
+    question_no = data.get("question_no")
+    selected_option = data.get("selected_option")
+
+    # ✅ NEW (ONLY ADD)
+    time_taken = data.get("time_taken", 0)
+
+    if not student_id or not exam_id:
+        return jsonify({"error": "session missing"}), 401
+
+    conn = sqlite3.connect("database_v2.db")
+    cur = conn.cursor()
+
+    # ✅ SAME QUERY + ONLY ONE COLUMN ADDED
+    cur.execute("""
+        INSERT INTO student_answers
+            (exam_id, student_id, question_no, selected_option, time_taken)
+        VALUES (?, ?, ?, ?, ?)
+        ON CONFLICT(exam_id, student_id, question_no)
+        DO UPDATE SET
+            selected_option = excluded.selected_option,
+            time_taken = excluded.time_taken
+    """, (
+        exam_id,
+        student_id,
+        question_no,
+        selected_option,
+        time_taken
+    ))
+
+    conn.commit()
+    conn.close()
+
+    return jsonify({
+        "status": "saved",
+        "time_taken": time_taken
+    })
+
+
+def student_pause_check(exam_id):
+    import sqlite3
+    conn = sqlite3.connect("database_v2.db")
+    conn.row_factory = sqlite3.Row
+    cur = conn.cursor()
+
+    # existing code below (DO NOT CHANGE)
+    cur.execute("""
+        SELECT paused
+        FROM exam_sessions
+        WHERE student_id = ? AND exam_id = ?
+    """, (student_id, exam_id))
+
+    row = cur.fetchone()
 
     return {
-        "enabled": True,
-        "remaining_seconds": remaining,
-        "status": sess["status"]   # 🔥 VERY IMPORTANT
+        "paused": row["paused"] if row else 0
     }
 
-# -------------------------------------------------
-# RUN
-# -------------------------------------------------
+
+@app.route("/admin/pause/<int:exam_id>/<int:student_id>", methods=["GET,POST"])
+def admin_pause_exam(exam_id, student_id):
+    conn = get_db()
+    conn.row_factory = sqlite3.Row
+    cur = conn.cursor()
+    cur.execute("""
+      UPDATE exam_sessions
+      SET status = 'PAUSED',
+       paused = 1,
+       resume_allowed = 0
+     WHERE exam_id = ? AND student_id = ?
+    """, (exam_id, student_id))
+    conn.commit()
+    return "Paused"
+
+@app.route("/system/auto-pause/<int:exam_id>/<int:student_id>")
+def system_auto_pause(exam_id, student_id):
+    conn = get_db()
+    cur = conn.cursor()
+
+    cur.execute("""
+        SELECT status FROM exam_student_status
+        WHERE exam_id=? AND student_id=?
+    """, (exam_id, student_id))
+
+    row = cur.fetchone()
+    conn.close()
+
+    if row and row["status"] == "PAUSED":
+        return jsonify({"paused": 1})
+
+    # ✅ VERY IMPORTANT
+    return jsonify({"paused": 0})
+
+@app.route("/exam-paused")
+def exam_paused():
+    exam_id = session.get("exam_id")
+    if not exam_id:
+        return redirect("/student/login")
+
+    return render_template(
+        "student/exam_paused.html",
+        exam_id=exam_id   # ✅ THIS WAS MISSING
+    )
+
+
+
+
+
+import os
+
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+DB_PATH = os.path.join(BASE_DIR, "database_v2.db")
+
+@app.route("/student/log-violation", methods=["POST"])
+def log_violation():
+    print("🔥 STUDENT LOG VIOLATION HIT:", request.json)
+    data = request.get_json()
+    exam_id = session["exam_id"]
+    student_id = session["student_id"]
+    event_type = data.get("event_type")
+    # 👁️ If no face detected → save face snapshot
+    if event_type == "no_face":
+        save_face_snapshot_internal(student_id, exam_id)
+
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    cur = conn.cursor()
+
+    # 1️⃣ Log violation
+    cur.execute("""
+        INSERT INTO exam_violations (student_id, exam_id, event_type)
+        VALUES (?, ?, ?)
+    """, (student_id, exam_id, event_type))
+
+    # 2️⃣ Count violations
+    cur.execute("""
+        SELECT COUNT(*) 
+        FROM exam_violations
+        WHERE exam_id = ? AND student_id = ?
+    """, (exam_id, student_id))
+
+    violation_count = cur.fetchone()[0]
+    print("🔥 VIOLATION COUNT:",violation_count)
+
+    response = {"count": violation_count}
+
+    # 3️⃣ Warnings (2–5)
+    if 2 <= violation_count <= 5:
+        response["warning"] = 1
+
+    # 4️⃣ AUTO PAUSE (6th)
+    if violation_count >= 6:
+        cur.execute("""
+            UPDATE exam_sessions
+            SET status = 'PAUSED',
+                paused = 1,
+                resume_allowed = 0
+            WHERE exam_id = ? AND student_id = ?
+        """, (exam_id, student_id))
+
+        response["paused"] = 1
+
+    conn.commit()
+    conn.close()
+
+    return jsonify(response)
+
+
+@app.route("/student/exam/resume-status")
+def resume_status():
+    student_id = session.get("student_id")
+    exam_id = session.get("exam_id")
+
+    if not student_id or not exam_id:
+        return jsonify({"resumed": 0})
+
+    conn = get_db()
+    cur = conn.cursor()
+
+    cur.execute("""
+        SELECT status
+        FROM exam_sessions
+        WHERE exam_id = ? AND student_id = ?
+    """, (exam_id, student_id))
+
+    row = cur.fetchone()
+    conn.close()
+
+    if row and row[0] == "RUNNING":
+        return jsonify({
+            "resumed": 1,
+            "exam_id": exam_id   # 🔥 VERY IMPORTANT
+        })
+
+    return jsonify({"resumed": 0})
+
+
+
+@app.route("/student/exam/resume-status")
+def student_resume_status():
+    student_id = session.get("student_id")
+    exam_id = session.get("exam_id")
+
+    if not student_id or not exam_id:
+        return jsonify({"resumed": 0})
+
+    conn = get_db()
+    conn.row_factory = sqlite3.Row
+    cur = conn.cursor()
+
+    cur.execute("""
+        SELECT status
+        FROM exam_sessions
+        WHERE student_id = ? AND exam_id = ?
+    """, (student_id, exam_id))
+
+    row = cur.fetchone()
+    conn.close()
+
+    if row and row["status"] == "RUNNING":
+        return jsonify({"resumed": 1})
+
+    return jsonify({"resumed": 0})
+@app.route("/admin/exam/<int:exam_id>/resume/<int:student_id>", methods=["POST"])
+def admin_resume_exam(exam_id, student_id):
+    if not session.get("admin"):
+        return redirect("/admin/login")
+
+    conn = get_db()
+    cur = conn.cursor()
+
+    cur.execute("""
+        UPDATE exam_sessions
+        SET
+            paused = 0,
+            resume_allowed = 1,
+            status = 'RUNNING',
+            paused_at = NULL
+        WHERE exam_id = ? AND student_id = ?
+    """, (exam_id, student_id))
+
+    conn.commit()
+    conn.close()
+
+    return redirect(f"/admin/exam/{exam_id}/analytics")
+
+@app.route("/student/exam/resume-status")
+def student_exam_resume_status():
+    student_id = session.get("student_id")
+    exam_id = session.get("exam_id")  # ensure you set this on exam start
+
+    if not student_id or not exam_id:
+        return jsonify({"resume": False})
+
+    conn = get_db()
+    conn.row_factory = sqlite3.Row
+    cur = conn.cursor()
+
+    cur.execute("""
+        SELECT paused, status
+        FROM exam_sessions
+        WHERE student_id = ? AND exam_id = ?
+    """, (student_id, exam_id))
+
+    row = cur.fetchone()
+    conn.close()
+
+    if not row:
+        return jsonify({"resume": False})
+
+    # 🔥 FINAL DECISION
+    if row["paused"] == 0 and row["status"] == "RUNNING":
+        return jsonify({"resume": True})
+
+    return jsonify({"resume": False})  
+
+@app.route("/student/exam/auto-pause", methods=["POST"])
+def auto_pause_exam():
+    student_id = session.get("student_id")
+    exam_id = session.get("exam_id")
+
+    if not student_id or not exam_id:
+        return jsonify({"success": False})
+
+    conn = get_db()
+    cur = conn.cursor()
+
+    cur.execute("""
+        UPDATE exam_sessions
+        SET status = 'PAUSED',
+            paused = 1,
+            resume_allowed = 0,
+            paused_at = CURRENT_TIMESTAMP
+        WHERE student_id = ? AND exam_id = ?
+    """, (student_id, exam_id))
+
+    conn.commit()
+    conn.close()
+
+    return jsonify({"success": True})
+
+from datetime import datetime
+import sqlite3
+
+from datetime import datetime
+
+@app.route("/student/exam-timer")
+def student_exam_timer():
+
+    student_id = session.get("student_id")
+    exam_id = session.get("exam_id")
+
+    if not student_id or not exam_id:
+        return jsonify({"enabled": False})
+
+    conn = get_db()
+    conn.row_factory = sqlite3.Row
+    cur = conn.cursor()
+
+    cur.execute("""
+        SELECT
+            timer_enabled,
+            timer_started_at,
+            exam_duration
+        FROM exam_sessions
+        WHERE student_id = ? AND exam_id = ?
+    """, (student_id, exam_id))
+
+    row = cur.fetchone()
+    conn.close()
+
+    if not row or not row["timer_enabled"]:
+        return jsonify({"enabled": False})
+
+    start_raw = row["timer_started_at"]
+
+    if not start_raw:
+        return jsonify({"enabled": False})
+
+    # INTEGER unix timestamp
+    if isinstance(start_raw, int):
+        start = datetime.fromtimestamp(start_raw)
+    else:
+        # STRING timestamp
+        start = datetime.fromisoformat(start_raw)
+
+    elapsed = (datetime.now() - start).total_seconds()
+    remaining = max(0, int(row["exam_duration"]) - int(elapsed))
+
+    return jsonify({
+        "enabled": True,
+        "remaining_seconds": remaining
+    })
+@app.route("/student/start-exam-timer", methods=["POST"])
+def start_exam_timer():
+    if "student_id" not in session or "exam_id" not in session:
+        return {"error": "unauthorized"}, 401
+
+    student_id = session["student_id"]
+    exam_id = session["exam_id"]
+
+    db = get_db()
+
+    # check if start_time already exists
+    row = db.execute("""
+        SELECT start_time FROM exam_sessions
+        WHERE student_id = ? AND exam_id = ?
+    """, (student_id, exam_id)).fetchone()
+
+    if row and row["start_time"]:
+        # already started — do nothing
+        return {"started": True}
+
+    now = int(time.time())
+
+    db.execute("""
+        UPDATE exam_sessions
+        SET start_time = ?
+        WHERE student_id = ? AND exam_id = ?
+    """, (now, student_id, exam_id))
+
+    db.commit()
+
+    return {"started": True}
+
+@app.route("/admin/exam/<int:exam_id>/pause/<int:student_id>")
+def pause_exam(exam_id, student_id):
+    conn = get_db()
+    cur = conn.cursor()
+
+    import time
+
+    cur.execute("""
+        UPDATE exam_sessions
+        SET
+            status = 'PAUSED',
+            paused = 1,
+            paused_at = ?
+        WHERE exam_id = ? AND student_id = ?
+    """, (int(time.time()), exam_id, student_id))
+
+    conn.commit()
+    conn.close()
+
+    return jsonify({"paused": 1})
+
+
+    
+
+import os
+
 if __name__ == "__main__":
-    app.run(debug=True)
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port)

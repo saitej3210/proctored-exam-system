@@ -103,6 +103,46 @@
         .submit:hover {
             transform: translateY(-2px);
         }
+
+        /* ===========================
+           MOBILE RESPONSIVE FIX
+        =========================== */
+        @media (max-width: 768px) {
+
+            body {
+                padding: 16px;
+                align-items: flex-start;
+            }
+
+            .card {
+                width: 100%;
+                max-width: 100%;
+                padding: 20px;
+                border-radius: 16px;
+                margin-top: 20px;
+            }
+
+            h2 {
+                font-size: 20px;
+            }
+
+            .section-title {
+                font-size: 15px;
+            }
+
+            .row {
+                font-size: 14px;
+            }
+
+            input[type="checkbox"] {
+                transform: scale(1.2);
+            }
+
+            .submit {
+                font-size: 16px;
+                padding: 14px;
+            }
+        }
     </style>
 </head>
 
@@ -113,68 +153,66 @@
 
         <h2>📄 Create New Exam</h2>
 
-        <!-- ===== TIMER ===== -->
-        <div class="section">
-            <div class="row">
-                <span>Enable Timer</span>
-                <input type="checkbox" id="enableTimer" name="enable_timer">
-            </div>
+<!-- TIMER -->
+<div class="section">
+    <div class="row">
+        <span>Enable Timer</span>
+        <input type="checkbox" id="enableTimer" name="enable_timer">
+    </div>
 
-            <div class="timer-box" id="timerBox">
-                <label>Exam Duration (in minutes)</label>
-                <input
-                    type="number"
-                    name="timer_minutes"
-                    min="1"
-                    placeholder="Eg: 30"
-                >
-            </div>
-        </div>
+    <!-- THIS WAS THE MAIN FIX -->
+    <div class="timer-box" id="timerBox" style="display:none; margin-top:8px;">
+        <label>Exam Duration (in minutes)</label>
+        <input
+            type="number"
+            name="timer_minutes"
+            min="1"
+            placeholder="Eg: 30"
+        >
+    </div>
+</div>
 
-        <!-- ===== SECURITY ===== -->
-        <div class="section">
-            <div class="section-title">Security Settings</div>
+<!-- SECURITY -->
+<div class="section">
+    <div class="section-title">Security Settings</div>
 
-            <div class="row">
-                <span>Browser Lock</span>
-                <input type="checkbox" name="browser_lock" checked>
-            </div>
+    <div class="row">
+        <span>Browser Lock</span>
+        <input type="checkbox" name="browser_lock" checked>
+    </div>
 
-            <div class="row">
-                <span>Tab Switch Detection</span>
-                <input type="checkbox" name="tab_switch" checked>
-            </div>
+    <div class="row">
+        <span>Tab Switch Detection</span>
+        <input type="checkbox" name="tab_switch" checked>
+    </div>
 
-            <div class="row">
-                <span>Screenshot Block</span>
-                <input type="checkbox" name="screenshot_block" checked>
-            </div>
+    <div class="row">
+        <span>Screenshot Block</span>
+        <input type="checkbox" name="screenshot_block" checked>
+    </div>
 
-            <div class="row">
-                <span>Auto Pause on Violation</span>
-                <input type="checkbox" name="auto_pause" checked>
-            </div>
-        </div>
+    <div class="row">
+        <span>Auto Pause on Violation</span>
+        <input type="checkbox" name="auto_pause" checked>
+    </div>
+</div>
 
-        <!-- ===== AI ===== -->
-        <div class="section">
-            <div class="section-title">AI Proctoring (Optional)</div>
+<!-- AI -->
+<div class="section">
+    <div class="section-title">AI Proctoring (Optional)</div>
 
-            <div class="row">
-                <span>Face Monitoring</span>
-                <input type="checkbox" name="face_monitoring">
-            </div>
+    <div class="row">
+        <span>Face Monitoring</span>
+        <input type="checkbox" name="face_monitoring">
+    </div>
 
-            <div class="row">
-                <span>Speech Detection</span>
-                <input type="checkbox" name="speech_detection">
-            </div>
-        </div>
+    <div class="row">
+        <span>Speech Detection</span>
+        <input type="checkbox" name="speech_detection">
+    </div>
+</div>
 
-        <button class="submit">
-            Save & Continue →
-        </button>
-
+<button class="submit">Save & Continue →</button>
     </div>
 </form>
 

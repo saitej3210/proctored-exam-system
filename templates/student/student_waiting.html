@@ -1,153 +1,108 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <title>Exam Waiting Room</title>
+<meta charset="UTF-8">
+<title>Exam Waiting Room</title>
 
-    <style>
-        body {
-            margin: 0;
-            height: 100vh;
-            background: radial-gradient(circle at top, #0f172a, #020617);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-family: "Segoe UI", system-ui, sans-serif;
-            color: #e5e7eb;
-        }
-
-        .card {
-            width: 520px;
-            background: linear-gradient(180deg, #020617, #020617);
-            border-radius: 18px;
-            padding: 32px;
-            box-shadow: 0 30px 80px rgba(0,0,0,.65);
-            border: 1px solid rgba(148,163,184,.15);
-        }
-
-        .title {
-            font-size: 22px;
-            font-weight: 700;
-            text-align: center;
-            margin-bottom: 6px;
-        }
-
-        .roll {
-            text-align: center;
-            color: #94a3b8;
-            margin-bottom: 18px;
-            font-size: 14px;
-        }
-
-        .status-box {
-            padding: 14px;
-            border-radius: 10px;
-            text-align: center;
-            font-weight: 600;
-            margin-bottom: 22px;
-        }
-
-        .pending {
-            background: rgba(234,179,8,.15);
-            color: #fde68a;
-            border: 1px solid rgba(234,179,8,.35);
-        }
-
-        .approved {
-            background: rgba(34,197,94,.15);
-            color: #bbf7d0;
-            border: 1px solid rgba(34,197,94,.35);
-        }
-
-        .instructions {
-            margin-top: 12px;
-            background: rgba(30,41,59,.35);
-            padding: 16px;
-            border-radius: 12px;
-            border: 1px solid rgba(148,163,184,.12);
-        }
-
-        .instructions h4 {
-            margin: 0 0 10px 0;
-            font-size: 15px;
-            color: #e5e7eb;
-        }
-
-        .instructions ul {
-            margin: 0;
-            padding-left: 18px;
-            font-size: 14px;
-            color: #cbd5f5;
-        }
-
-        .instructions li {
-            margin-bottom: 6px;
-        }
-
-        .btn {
-            margin-top: 22px;
-            width: 100%;
-            padding: 14px;
-            border-radius: 12px;
-            border: none;
-            font-size: 15px;
-            font-weight: 600;
-            cursor: not-allowed;
-            background: #334155;
-            color: #94a3b8;
-        }
-
-        .btn-approved {
-            background: linear-gradient(135deg, #22c55e, #16a34a);
-            color: #022c22;
-            cursor: default;
-        }
-    </style>
+<style>
+body{
+  background:#0f172a;
+  color:#e5e7eb;
+  font-family:Segoe UI, sans-serif;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  height:100vh;
+}
+.card{
+  background:#020617;
+  border-radius:16px;
+  padding:30px;
+  width:360px;
+  text-align:center;
+}
+.badge{
+  margin:15px 0;
+  padding:12px;
+  border-radius:12px;
+  font-weight:600;
+}
+.waiting{
+  background:rgba(234,179,8,.15);
+  color:#fde047;
+}
+.approved{
+  background:rgba(34,197,94,.15);
+  color:#4ade80;
+}
+.instructions{
+  margin-top:20px;
+  text-align:left;
+  background:rgba(255,255,255,.05);
+  padding:15px;
+  border-radius:12px;
+  font-size:14px;
+}
+</style>
 </head>
+
 <body>
 
 <div class="card">
+  <h2>📄 Exam Waiting Room</h2>
 
-    <div class="title">📄 Exam Waiting Room</div>
-    <div class="roll">Welcome Roll No: <b>{{ student.roll }}</b></div>
+  <div id="statusBox" class="badge waiting">
+    ⏳ Waiting for Admin Approval
+  </div>
 
-    {% if status == "approved" %}
-        <div class="status-box approved">
-            ✅ Approved by Admin<br>
-            <small>Waiting for exam to start</small>
-        </div>
-    {% else %}
-        <div class="status-box pending">
-            ⏳ Waiting for Admin Approval
-        </div>
-    {% endif %}
-
-    <div class="instructions">
-        <h4>⚠️ Exam Instructions</h4>
-        <ul>
-            <li>Full screen mode is mandatory</li>
-            <li>Tab switching is strictly monitored</li>
-            <li>Camera & microphone may be monitored</li>
-            <li>All answers are auto-saved</li>
-            <li>Leaving exam may require re-approval</li>
-        </ul>
-    </div>
-
-    {% if status == "approved" %}
-        <button class="btn btn-approved">
-            Approved – Please Wait
-        </button>
-    {% else %}
-        <button class="btn">
-            Approval Required
-        </button>
-    {% endif %}
-
+  <div class="instructions">
+    <b>⚠ Exam Instructions</b>
+    <ul>
+      <li>Full screen mode is mandatory</li>
+      <li>Tab switching is monitored</li>
+      <li>All answers are auto-saved</li>
+      <li>Leaving exam may require re-approval</li>
+    </ul>
+  </div>
 </div>
+
 <script>
-setInterval(() => {
-  location.reload();
-}, 2000);
+const EXAM_ID = {{ exam_id }};
+
+async function checkStatus(){
+  try{
+    const res = await fetch(`/student/waiting/status/${EXAM_ID}`, {
+      cache: "no-store"
+    });
+    const data = await res.json();
+
+    const box = document.getElementById("statusBox");
+
+    if(data.status === "WAITING"){
+      box.className = "badge waiting";
+      box.innerText = "⏳ Waiting for Admin Approval";
+    }
+
+    if(data.status === "APPROVED"){
+      box.className = "badge approved";
+      box.innerText = "✅ Approved by Admin\nWaiting for exam to start";
+    }
+
+    if(data.status === "RUNNING"){
+      window.location.href = `/student/exam/${EXAM_ID}`;
+    }
+
+    if(data.status === "LEFT" || data.status === "LOGOUT"){
+      window.location.href = "/student/login";
+    }
+
+  }catch(e){
+    console.error("Status check failed", e);
+  }
+}
+
+setInterval(checkStatus, 2000);
 </script>
+
 </body>
 </html>

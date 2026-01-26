@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Question Analytics</title>
+<style>
+body{background:#020617;color:#e5e7eb;font-family:Segoe UI;padding:30px}
+.card{background:#0f172a;padding:20px;border-radius:14px;margin-bottom:20px}
+.correct{color:#22c55e;font-weight:700}
+</style>
+</head>
+<body>
+<form method="GET" style="margin-bottom:25px">
+  <input type="hidden" name="exam_id" value="{{ exam_id }}">
+
+  <select name="student_id"
+    onchange="this.form.submit()"
+    style="
+      padding:10px;
+      border-radius:8px;
+      background:#020617;
+      color:#e5e7eb;
+      border:1px solid #334155;
+      min-width:250px
+    "
+  >
+    <option value="">👥 All Students</option>
+
+    {% for s in students %}
+      <option value="{{ s.id }}"
+        {% if selected_student and selected_student|int == s.id %}
+          selected
+        {% endif %}
+      >
+        {{ s.roll }} – {{ s.name }}
+      </option>
+    {% endfor %}
+  </select>
+</form>
+<h2>📊 Question Analytics – Exam {{ exam_id }}</h2>
+<a href="/admin/exam/{{ exam_id }}/analytics">⬅ Back</a>
+
+{% for q in analytics %}
+<div class="card">
+  <b>Q{{ q.question_no }}. {{ q.question }}</b><br><br>
+
+  A: {{ q.a_count }}<br>
+  B: {{ q.b_count }}<br>
+  C: {{ q.c_count }}<br>
+  D: {{ q.d_count }}<br><br>
+
+  <span class="correct">
+    Correct Option: {{ q.correct_option }} |
+    Correct Attempts: {{ q.correct_count }}
+  </span>
+</div>
+{% endfor %}
+
+</body>
+</html>

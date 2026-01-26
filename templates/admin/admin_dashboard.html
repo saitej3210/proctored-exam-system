@@ -1,64 +1,13 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<title>Admin Dashboard</title>
-<link rel="stylesheet" href="{{ url_for('static', filename='space.css') }}">
-</head>
-    <meta charset="UTF-8">
-    <title>Admin Dashboard</title>
-    <style>
-        body {
-            margin: 0;
-            font-family: Arial, sans-serif;
-            background: #0f172a;
-            color: white;
-        }
-        .header {
-            padding: 20px;
-            font-size: 24px;
-            font-weight: bold;
-            background: #020617;
-        }
-        .container {
-            padding: 30px;
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-            gap: 20px;
-        }
-        .card {
-            background: #020617;
-            border-radius: 12px;
-            padding: 30px;
-            text-align: center;
-            cursor: pointer;
-            transition: 0.3s;
-            border: 1px solid #1e293b;
-        }
-        .card:hover {
-            transform: translateY(-5px);
-            background: #020617;
-            border-color: #22c55e;
-        }
-        .card h2 {
-            margin: 15px 0 0;
-            font-size: 18px;
-        }
-        .icon {
-            font-size: 40px;
-        }
-        a {
-            text-decoration: none;
-            color: white;
-        }
-    </style>
-</head>
-<body>
-
-<!DOCTYPE html>
-<html lang="en">
-<head>
 <meta charset="UTF-8">
 <title>Admin Dashboard</title>
+
+<link rel="stylesheet" href="{{ url_for('static', filename='space.css') }}">
+
+<!-- 🔥 MOBILE AUTO REDIRECT -->
+
 
 <style>
 * {
@@ -211,7 +160,42 @@ body {
 
     </div>
 </div>
+<!-- 🔐 CHANGE PASSWORD -->
+<div class="card">
+  <h3>🔐 Change Password</h3>
 
+  <button class="btn start" onclick="requestOtp()">
+    Send OTP
+  </button>
+
+  <div style="margin-top:15px">
+    <input id="otp" placeholder="Enter OTP" />
+    <input id="newpass" type="password" placeholder="New Password" />
+    <button class="btn release" onclick="changePassword()">
+      Update Password
+    </button>
+  </div>
+</div>
+
+<script>
+async function requestOtp(){
+  await fetch("/admin/request-password-otp", {method:"POST"});
+  alert("OTP sent to registered mobile");
+}
+
+async function changePassword(){
+  const otp = document.getElementById("otp").value;
+  const pass = document.getElementById("newpass").value;
+
+  const res = await fetch("/admin/change-password", {
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({otp, password: pass})
+  });
+
+  const data = await res.json();
+  alert(data.success ? "Password changed" : "Invalid OTP");
+}
+</script>
 </body>
 </html>
-

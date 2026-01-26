@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Exam {{ exam_id }} - Camera Analytics</title>
+  <style>
+    body {
+      background:#0f172a;
+      color:#e5e7eb;
+      font-family: system-ui;
+      padding:20px;
+    }
+    h2 {
+      margin-bottom:20px;
+    }
+    .grid {
+      display:grid;
+      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+      gap:16px;
+    }
+    .card {
+      background:#020617;
+      border:1px solid #1e293b;
+      border-radius:12px;
+      padding:10px;
+      text-align:center;
+    }
+    img {
+      width:100%;
+      border-radius:10px;
+      margin-bottom:8px;
+    }
+    .name {
+      font-weight:600;
+    }
+    .time {
+      font-size:12px;
+      color:#94a3b8;
+    }
+  </style>
+</head>
+
+<body>
+
+<h2>📷 Camera Analytics — Exam {{ exam_id }}</h2>
+
+{% if faces %}
+  <div class="grid">
+    {% for f in faces %}
+      <div class="card">
+  <img src="{{ f['image_path'] }}" alt="face">
+
+  <div class="name">{{ f['student_name'] }}</div>
+  <div class="time">{{ f['created_at'] }}</div>
+
+  <hr style="border-color:#1e293b;margin:8px 0;">
+
+  <div style="font-size:13px;text-align:left">
+    <b>Violations:</b> {{ f['total_violations'] or 0 }}<br>
+    🔁 Tab switch: {{ f['tab_switch'] or 0 }}<br>
+    👁 Blur: {{ f['blur'] or 0 }}<br>
+    🚫 No face: {{ f['no_face'] or 0 }}<br>
+    👥 Multiple faces: {{ f['multiple_faces'] or 0 }}
+  </div>
+</div>
+    {% endfor %}
+  </div>
+{% else %}
+  <p>No face snapshots yet.</p>
+{% endif %}
+
+</body>
+</html>

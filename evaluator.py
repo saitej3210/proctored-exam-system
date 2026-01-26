@@ -1,114 +1,53 @@
-import sqlite3
+from db import get_db
 
-DB_PATH = "database.db"
-
-def get_db():
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    return conn
-
-
-def evaluate_exam(student_id, exam_id):
+def evaluate_exam(student_roll, exam_id):
     conn = get_db()
     cur = conn.cursor()
 
-    # -------------------------------------------------
-    # 1️⃣ Ensure required tables exist
-    # -------------------------------------------------
-
-    # results table
+    # ----------------------------
+    # Fetch correct vs selected
+    # ----------------------------
     cur.execute("""
-    CREATE TABLE IF NOT EXISTS results (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        student_id TEXT,
-        exam_id INTEGER,
-        score INTEGER,
-        total INTEGER
-    )
-    """)
+        SELECT
+            q.question_no,
+            q.correct_option,
+            sa.selected_option
+        FROM questions q
+        LEFT JOIN student_answers sa
+            ON q.question_no = sa.question_no
+            AND sa.student_id = ?
+            AND sa.exam_id = ?
+        WHERE q.exam_id = ?
+        ORDER BY q.question_no
+    """, (student_roll, exam_id, exam_id))
 
-    # questions table (FIX FOR YOUR ERROR)
-    cur.execute("""
-    CREATE TABLE IF NOT EXISTS questions (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        exam_id INTEGER,
-        question_no INTEGER,
-        question TEXT,
-        option_a TEXT,
-        option_b TEXT,
-        option_c TEXT,
-        option_d TEXT,
-        correct_option TEXT
-    )
-    """)
-
-    # student_answers table safety
-    cur.execute("""
-    CREATE TABLE IF NOT EXISTS student_answers (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        student_id TEXT,
-        exam_id INTEGER,
-        question_no INTEGER,
-        selected_option TEXT
-    )
-    """)
-
-    # -------------------------------------------------
-    # 2️⃣ Fetch correct answers
-    # -------------------------------------------------
-    cur.execute("""
-        SELECT question_no, correct_option
-        FROM questions
-        WHERE exam_id = ?
-    """, (exam_id,))
     rows = cur.fetchall()
 
-    if not rows:
-        print("⚠️ No questions found for exam:", exam_id)
-        conn.close()
-        return
+    correct = 0
+    total = len(rows)
 
-    correct_answers = {
-        row["question_no"]: row["correct_option"] for row in rows
-    }
+    for r in rows:
+        if r["selected_option"] == r["correct_option"]:
+            correct += 1
 
-    # -------------------------------------------------
-    # 3️⃣ Fetch student answers
-    # -------------------------------------------------
-    cur.execute("""
-        SELECT question_no, selected_option
-        FROM student_answers
-        WHERE student_id = ? AND exam_id = ?
-    """, (student_id, exam_id))
-    student_answers = {
-        row["question_no"]: row["selected_option"]
-        for row in cur.fetchall()
-    }
-
-    # -------------------------------------------------
-    # 4️⃣ Evaluate
-    # -------------------------------------------------
-    score = 0
-    for qno, correct in correct_answers.items():
-        if student_answers.get(qno) == correct:
-            score += 1
-
-    total = len(correct_answers)
-
-    # -------------------------------------------------
-    # 5️⃣ Save result
-    # -------------------------------------------------
+    # ----------------------------
+    # DELETE OLD RESULT (VERY IMPORTANT)
+    # ----------------------------
     cur.execute("""
         DELETE FROM results
         WHERE student_id = ? AND exam_id = ?
-    """, (student_id, exam_id))
+    """, (student_roll, exam_id))
 
+    # ----------------------------
+    # INSERT FRESH RESULT
+    # ----------------------------
     cur.execute("""
-        INSERT INTO results (student_id, exam_id, score, total)
-        VALUES (?, ?, ?, ?)
-    """, (student_id, exam_id, score, total))
+        INSERT INTO results
+        (student_id, exam_id, correct, total, total_questions)
+        VALUES (?, ?, ?, ?, ?)
+    """, (student_roll, exam_id, correct, total, total))
 
     conn.commit()
     conn.close()
 
-    print(f"✅ RESULT SAVED: {student_id} | {score}/{total}")
+    print(f"✅ RESULT SAVED: {student_roll} | {correct}/{total}")

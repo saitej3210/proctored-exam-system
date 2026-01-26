@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Exam Timeline Replay</title>
+
+<style>
+body{
+  background:#020617;
+  color:#e5e7eb;
+  font-family:Segoe UI, sans-serif;
+  padding:30px
+}
+.container{
+  max-width:900px;
+  margin:auto
+}
+.event{
+  padding:15px;
+  border-left:4px solid #38bdf8;
+  margin-bottom:15px;
+  background:#0f172a;
+  border-radius:8px
+}
+.time{
+  color:#94a3b8;
+  font-size:13px
+}
+.type{
+  font-weight:600;
+  margin-top:6px
+}
+.student{
+  color:#facc15
+}
+.event-type{
+  color:#e5e7eb
+}
+.back{
+  display:inline-block;
+  margin-bottom:20px;
+  color:#93c5fd;
+  text-decoration:none
+}
+.badge{
+  display:inline-block;
+  padding:3px 8px;
+  border-radius:6px;
+  font-size:12px;
+  margin-left:8px;
+  background:#1e293b;
+  color:#e5e7eb
+}
+.badge.blur{ background:#16a34a }
+.badge.tab_switch{ background:#2563eb }
+.badge.copy{ background:#f59e0b }
+.badge.paste{ background:#f97316 }
+.badge.mobile{ background:#dc2626 }
+.badge.multiple_faces{ background:#7c2d12 }
+</style>
+</head>
+
+<body>
+<div class="container">
+
+<a class="back" href="/admin/exam/{{ exam_id }}/analytics">
+← Back to Analytics
+</a>
+
+<h2>🕒 Exam Timeline Replay</h2>
+
+{% for e in timeline %}
+<div class="event">
+  <div class="time">{{ e.created_at }}</div>
+
+  <div class="type">
+    <span class="student">{{ e.roll }} – {{ e.name }}</span>
+    →
+    <span class="event-type">
+      {{ e.event_type.replace('_', ' ').title() }}
+    </span>
+
+    <span class="badge {{ e.event_type }}">
+      {{ e.event_type.replace('_', ' ').upper() }}
+    </span>
+  </div>
+</div>
+{% else %}
+<p style="color:#94a3b8">No events recorded</p>
+{% endfor %}
+
+</div>
+</body>
+</html>
